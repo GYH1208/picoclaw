@@ -26,15 +26,16 @@ import (
 
 // gateway holds the state for the managed gateway process.
 var gateway = struct {
-	mu               sync.Mutex
-	cmd              *exec.Cmd
-	owned            bool // true if we started the process, false if we attached to an existing one
-	bootDefaultModel string
-	runtimeStatus    string
-	startupDeadline  time.Time
-	logs             *LogBuffer
-	pidData          *ppid.PidFileData // pid file data read from picoclaw.pid.json
-	picoToken        string            // cached pico token from config (for proxy auth validation)
+	mu                  sync.Mutex
+	cmd                 *exec.Cmd
+	owned               bool // true if we started the process, false if we attached to an existing one
+	bootDefaultModel    string
+	bootConfigSignature string
+	runtimeStatus       string
+	startupDeadline     time.Time
+	logs                *LogBuffer
+	pidData             *ppid.PidFileData // pid file data read from picoclaw.pid.json
+	picoToken           string            // cached pico token from config (for proxy auth validation)
 }{
 	runtimeStatus: "stopped",
 	logs:          NewLogBuffer(200),
@@ -234,14 +235,93 @@ func lookupModelConfig(cfg *config.Config, modelName string) *config.ModelConfig
 	return modelCfg
 }
 
-func gatewayRestartRequired(configDefaultModel, bootDefaultModel, gatewayStatus string) bool {
+func computeConfigSignature(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	var parts []string
+	defaultModel := strings.TrimSpace(cfg.Agents.Defaults.GetModelName())
+	if defaultModel != "" {
+		parts = append(parts, "model:"+defaultModel)
+	}
+	toolSignatures := []string{}
+	if cfg.Tools.ReadFile.Enabled {
+		toolSignatures = append(toolSignatures, "read_file")
+	}
+	if cfg.Tools.WriteFile.Enabled {
+		toolSignatures = append(toolSignatures, "write_file")
+	}
+	if cfg.Tools.ListDir.Enabled {
+		toolSignatures = append(toolSignatures, "list_dir")
+	}
+	if cfg.Tools.EditFile.Enabled {
+		toolSignatures = append(toolSignatures, "edit_file")
+	}
+	if cfg.Tools.AppendFile.Enabled {
+		toolSignatures = append(toolSignatures, "append_file")
+	}
+	if cfg.Tools.Exec.Enabled {
+		toolSignatures = append(toolSignatures, "exec")
+	}
+	if cfg.Tools.Cron.Enabled {
+		toolSignatures = append(toolSignatures, "cron")
+	}
+	if cfg.Tools.Web.Enabled {
+		toolSignatures = append(toolSignatures, "web")
+	}
+	if cfg.Tools.WebFetch.Enabled {
+		toolSignatures = append(toolSignatures, "web_fetch")
+	}
+	if cfg.Tools.Message.Enabled {
+		toolSignatures = append(toolSignatures, "message")
+	}
+	if cfg.Tools.SendFile.Enabled {
+		toolSignatures = append(toolSignatures, "send_file")
+	}
+	if cfg.Tools.FindSkills.Enabled {
+		toolSignatures = append(toolSignatures, "find_skills")
+	}
+	if cfg.Tools.InstallSkill.Enabled {
+		toolSignatures = append(toolSignatures, "install_skill")
+	}
+	if cfg.Tools.Spawn.Enabled {
+		toolSignatures = append(toolSignatures, "spawn")
+	}
+	if cfg.Tools.SpawnStatus.Enabled {
+		toolSignatures = append(toolSignatures, "spawn_status")
+	}
+	if cfg.Tools.I2C.Enabled {
+		toolSignatures = append(toolSignatures, "i2c")
+	}
+	if cfg.Tools.SPI.Enabled {
+		toolSignatures = append(toolSignatures, "spi")
+	}
+	if cfg.Tools.MCP.Enabled {
+		toolSignatures = append(toolSignatures, "mcp")
+	}
+	if cfg.Tools.MCP.Discovery.Enabled {
+		toolSignatures = append(toolSignatures, "mcp_discovery")
+	}
+	if cfg.Tools.MCP.Discovery.UseRegex {
+		toolSignatures = append(toolSignatures, "mcp_discovery_regex")
+	}
+	if cfg.Tools.MCP.Discovery.UseBM25 {
+		toolSignatures = append(toolSignatures, "mcp_discovery_bm25")
+	}
+	if len(toolSignatures) > 0 {
+		parts = append(parts, "tools:"+strings.Join(toolSignatures, ","))
+	}
+	return strings.Join(parts, ";")
+}
+
+func gatewayRestartRequiredBySignature(bootSignature, currentSignature, gatewayStatus string) bool {
 	if gatewayStatus != "running" {
 		return false
 	}
-	if strings.TrimSpace(configDefaultModel) == "" || strings.TrimSpace(bootDefaultModel) == "" {
+	if bootSignature == "" || currentSignature == "" {
 		return false
 	}
-	return configDefaultModel != bootDefaultModel
+	return bootSignature != currentSignature
 }
 
 func isCmdProcessAliveLocked(cmd *exec.Cmd) bool {
@@ -285,10 +365,11 @@ func attachToGatewayProcessLocked(pid int, cfg *config.Config) error {
 	gateway.owned = false // We didn't start this process
 	setGatewayRuntimeStatusLocked("running")
 
-	// Update bootDefaultModel from config
+	// Update bootDefaultModel and bootConfigSignature from config
 	if cfg != nil {
 		defaultModelName := strings.TrimSpace(cfg.Agents.Defaults.GetModelName())
 		gateway.bootDefaultModel = defaultModelName
+		gateway.bootConfigSignature = computeConfigSignature(cfg)
 	}
 
 	logger.InfoC("gateway", fmt.Sprintf("Attached to gateway process (PID: %d)", pid))
@@ -485,6 +566,7 @@ func (h *Handler) startGatewayLocked(initialStatus string, existingPid int) (int
 	gateway.cmd = cmd
 	gateway.owned = true // We started this process
 	gateway.bootDefaultModel = defaultModelName
+	gateway.bootConfigSignature = computeConfigSignature(cfg)
 	setGatewayRuntimeStatusLocked(initialStatus)
 	pid = cmd.Process.Pid
 	logger.InfoC("gateway", fmt.Sprintf("Started picoclaw gateway (PID: %d) from %s", pid, execPath))
@@ -505,6 +587,7 @@ func (h *Handler) startGatewayLocked(initialStatus string, existingPid int) (int
 		if gateway.cmd == cmd {
 			gateway.cmd = nil
 			gateway.bootDefaultModel = ""
+			gateway.bootConfigSignature = ""
 			if gateway.runtimeStatus != "restarting" {
 				setGatewayRuntimeStatusLocked("stopped")
 			}
@@ -790,7 +873,7 @@ func (h *Handler) handleGatewayStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) gatewayStatusData() map[string]any {
 	data := map[string]any{}
-	configDefaultModel := ""
+	var configDefaultModel string
 	cfg, cfgErr := config.LoadConfig(h.configPath)
 	if cfgErr == nil && cfg != nil {
 		configDefaultModel = strings.TrimSpace(cfg.Agents.Defaults.GetModelName())
@@ -852,11 +935,14 @@ func (h *Handler) gatewayStatusData() map[string]any {
 		}
 	}
 
-	bootDefaultModel, _ := data["boot_default_model"].(string)
 	gatewayStatus, _ := data["gateway_status"].(string)
-	data["gateway_restart_required"] = gatewayRestartRequired(
-		configDefaultModel,
-		bootDefaultModel,
+	currentConfigSignature := computeConfigSignature(cfg)
+	gateway.mu.Lock()
+	bootConfigSignature := gateway.bootConfigSignature
+	gateway.mu.Unlock()
+	data["gateway_restart_required"] = gatewayRestartRequiredBySignature(
+		bootConfigSignature,
+		currentConfigSignature,
 		gatewayStatus,
 	)
 

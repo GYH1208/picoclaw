@@ -32,6 +32,7 @@ import {
 } from "@/components/config/form-model"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
+import { refreshGatewayState } from "@/store/gateway"
 
 export function ConfigPage() {
   const { t } = useTranslation()
@@ -281,6 +282,7 @@ export function ConfigPage() {
       }
 
       toast.success(t("pages.config.save_success"))
+      void refreshGatewayState({ force: true })
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : t("pages.config.save_error"),
