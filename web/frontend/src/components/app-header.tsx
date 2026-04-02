@@ -93,9 +93,20 @@ export function AppHeader() {
         <SidebarTrigger className="text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 w-9 items-center justify-center rounded-lg sm:hidden [&>svg]:size-5">
           <IconMenu2 />
         </SidebarTrigger>
-        <div className="hidden w-36 shrink-0 items-center sm:flex">
-          <Link to="/">
-            <img className="w-full" src="/logo_with_text.png" alt="Logo" />
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <img
+              className="h-8 w-8 shrink-0 object-contain"
+              src="/favicon.svg"
+              alt=""
+              draggable={false}
+            />
+            <span className="text-foreground text-sm font-semibold tracking-tight">
+              {t("header.brand")}
+            </span>
           </Link>
         </div>
       </div>
