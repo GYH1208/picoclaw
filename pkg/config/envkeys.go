@@ -51,6 +51,10 @@ const (
 	// EnvLauncherRequireDashboardAuth forces dashboard token login when set to a truthy value
 	// (1, true, yes, on). Overrides the default no-login launcher behavior.
 	EnvLauncherRequireDashboardAuth = "PICOCLAW_LAUNCHER_REQUIRE_DASHBOARD_AUTH"
+
+	// EnvAssistantDisplayName overrides the name the AI assistant uses to identify itself
+	// in conversation (system prompt). Default: "TsingPaw".
+	EnvAssistantDisplayName = "PICOCLAW_ASSISTANT_DISPLAY_NAME"
 )
 
 func truthyEnv(v string) bool {
@@ -72,6 +76,14 @@ func LauncherInsecureNoAuthEnabled() bool {
 // EnvLauncherRequireDashboardAuth).
 func LauncherRequireDashboardAuthEnabled() bool {
 	return truthyEnv(os.Getenv(EnvLauncherRequireDashboardAuth))
+}
+
+// GetAssistantDisplayName returns the display name the assistant uses in system prompts.
+func GetAssistantDisplayName() string {
+	if v := strings.TrimSpace(os.Getenv(EnvAssistantDisplayName)); v != "" {
+		return v
+	}
+	return "TsingPaw"
 }
 
 func GetHome() string {

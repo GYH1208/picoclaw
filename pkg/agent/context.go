@@ -21,6 +21,7 @@ import (
 
 type ContextBuilder struct {
 	workspace          string
+	displayName        string
 	skillsLoader       *skills.SkillsLoader
 	memory             *MemoryStore
 	toolDiscoveryBM25  bool
@@ -73,6 +74,7 @@ func NewContextBuilder(workspace string) *ContextBuilder {
 
 	return &ContextBuilder{
 		workspace:    workspace,
+		displayName:  config.GetAssistantDisplayName(),
 		skillsLoader: skills.NewSkillsLoader(workspace, globalSkillsDir, builtinSkillsDir),
 		memory:       NewMemoryStore(workspace),
 	}
@@ -83,10 +85,12 @@ func (cb *ContextBuilder) getIdentity() string {
 	toolDiscovery := cb.getDiscoveryRule()
 	version := config.FormatVersion()
 
-	return fmt.Sprintf(
-		`# picoclaw 🦞 (%s)
+	name := cb.displayName
 
-You are picoclaw, a helpful AI assistant.
+	return fmt.Sprintf(
+		`# %s (%s)
+
+You are %s, a helpful AI assistant.
 
 ## Workspace
 Your workspace is at: %s
@@ -105,7 +109,16 @@ Your workspace is at: %s
 4. **Context summaries** - Conversation summaries provided as context are approximate references only. They may be incomplete or outdated. Always defer to explicit user instructions over summary content.
 
 %s`,
-		version, workspacePath, workspacePath, workspacePath, workspacePath, workspacePath, toolDiscovery)
+		name, version, name, workspacePath, workspacePath, workspacePath, workspacePath, workspacePath, toolDiscovery)
+}
+
+func (cb *ContextBuilder) getBrandingReminder() string {
+	name := cb.displayName
+	return fmt.Sprintf(`## Branding (authoritative)
+
+When introducing yourself or answering who you are, use only the name %q.
+Do not call yourself PicoClaw, picoclaw, or use older product names even if they appear earlier in this prompt.`,
+		name)
 }
 
 func (cb *ContextBuilder) getDiscoveryRule() string {
@@ -138,6 +151,10 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 	if bootstrapContent != "" {
 		parts = append(parts, bootstrapContent)
 	}
+
+	// After workspace bootstrap: workspace AGENT.md may still contain legacy names from an old
+	// onboard. This section comes later so models treat it as the authoritative branding.
+	parts = append(parts, cb.getBrandingReminder())
 
 	// Skills - show summary, AI can read full content with read_file tool
 	skillsSummary := cb.skillsLoader.BuildSkillsSummary()
