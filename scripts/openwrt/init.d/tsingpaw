@@ -1,0 +1,123 @@
+#!/bin/sh /etc/rc.common
+#
+# TsingPaw / PicoClaw Web Launcher — OpenWrt/FriendlyWrt procd service
+#
+# 路由器上的目录和虚拟机不同：请在路由器上二选一配置：
+#
+#   A) 创建 /etc/tsingpaw.conf（推荐），内容一行，例如：
+#        TSINGPAW_DIR=/root/tsingpaw-arm
+#
+#   B) 或编辑本脚本下面的 TSINGPAW_DIR_DEFAULT
+#
+# 安装：
+#   cp tsingpaw /etc/init.d/tsingpaw && chmod +x /etc/init.d/tsingpaw
+#   /etc/init.d/tsingpaw enable && /etc/init.d/tsingpaw start
+#
+# 访问说明文件：cat /root/tsingpaw-access.txt
+#
+
+USE_PROCD=1
+START=99
+STOP=10
+
+LAUNCHER_BIN="picoclaw-launcher-linux-arm64"
+HTTP_PORT="${TSINGPAW_HTTP_PORT:-18800}"
+
+# 默认目录（仅当未设置 TSINGPAW_DIR 且自动探测失败时使用）
+TSINGPAW_DIR_DEFAULT="/root/tsingpaw-arm"
+
+ACCESS_FILE="${TSINGPAW_ACCESS_FILE:-/root/tsingpaw-access.txt}"
+
+# 路由器上可选的配置文件（export TSINGPAW_DIR=...）
+[ -f /etc/tsingpaw.conf ] && . /etc/tsingpaw.conf
+
+EXTRA_CMD_ARGS="-console -no-browser -public"
+[ "$HTTP_PORT" != "18800" ] && EXTRA_CMD_ARGS="$EXTRA_CMD_ARGS -port $HTTP_PORT"
+
+NAME=tsingpaw
+
+# 在常见路径中查找包含 launcher 的目录
+resolve_tsingpaw_dir() {
+	_try="$1"
+	if [ -n "$_try" ] && [ -x "$_try/$LAUNCHER_BIN" ]; then
+		echo "$_try"
+		return 0
+	fi
+	for d in \
+		"$TSINGPAW_DIR_DEFAULT" \
+		"/root/tsingpaw-arm" \
+		"/root/TsingPaw" \
+		"/root/tsingpaw" \
+		"/root/tsingpaw-arm64" \
+		"/opt/tsingpaw" \
+		"/usr/local/tsingpaw"
+	do
+		if [ -x "$d/$LAUNCHER_BIN" ]; then
+			echo "$d"
+			return 0
+		fi
+	done
+	return 1
+}
+
+tsingpaw_lan_ip() {
+	ip=$(uci -q get network.lan.ipaddr 2>/dev/null)
+	[ -n "$ip" ] && echo "$ip" && return
+	ip=$(ip -4 -br addr show br-lan 2>/dev/null | awk '{print $3}' | cut -d/ -f1 | head -1)
+	[ -n "$ip" ] && echo "$ip" && return
+	ip=$(ip -4 addr show 2>/dev/null | awk '/inet / && $2 !~ /^127\./ {print $2}' | cut -d/ -f1 | head -1)
+	[ -n "$ip" ] && echo "$ip" && return
+	echo "127.0.0.1"
+}
+
+write_access_info() {
+	TSINGPAW_DIR_RES="$1"
+	(
+		i=0
+		while [ "$i" -lt 30 ]; do
+			ip=$(tsingpaw_lan_ip)
+			[ -n "$ip" ] && [ "$ip" != "127.0.0.1" ] && break
+			i=$((i + 1))
+			sleep 2
+		done
+		[ -z "$ip" ] && ip=$(tsingpaw_lan_ip)
+		{
+			echo "TsingPaw Web UI: http://${ip}:${HTTP_PORT}"
+			echo "Gateway API (health): http://${ip}:18790/health"
+			echo "Install dir: ${TSINGPAW_DIR_RES}"
+			echo "Updated: $(date 2>/dev/null)"
+		} >"$ACCESS_FILE"
+		logger -t tsingpaw "Web UI http://${ip}:${HTTP_PORT} (dir=${TSINGPAW_DIR_RES}, see $ACCESS_FILE)"
+	) &
+}
+
+start_service() {
+	TSINGPAW_DIR_RES=$(resolve_tsingpaw_dir "${TSINGPAW_DIR:-}")
+	if [ -z "$TSINGPAW_DIR_RES" ]; then
+		logger -t tsingpaw "ERROR: cannot find $LAUNCHER_BIN. Set TSINGPAW_DIR in /etc/tsingpaw.conf or put binaries under $TSINGPAW_DIR_DEFAULT"
+		echo "tsingpaw: missing $LAUNCHER_BIN — configure /etc/tsingpaw.conf" >>"$ACCESS_FILE"
+		return 1
+	fi
+
+	PROG="$TSINGPAW_DIR_RES/$LAUNCHER_BIN"
+	if [ ! -x "$PROG" ]; then
+		logger -t tsingpaw "ERROR: not executable: $PROG"
+		return 1
+	fi
+
+	write_access_info "$TSINGPAW_DIR_RES"
+
+	procd_open_instance
+	procd_set_param command "$PROG" $EXTRA_CMD_ARGS
+	procd_set_param env TSINGPAW_DIR="$TSINGPAW_DIR_RES"
+	procd_set_param env HOME="${HOME:-/root}"
+	procd_set_param cwd "$TSINGPAW_DIR_RES"
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+stop_service() {
+	:
+}
