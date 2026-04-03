@@ -61,6 +61,11 @@ func main() {
 	noBrowser = flag.Bool("no-browser", false, "Do not auto-open browser on startup")
 	lang := flag.String("lang", "", "Language: en (English) or zh (Chinese). Default: auto-detect from system locale")
 	console := flag.Bool("console", false, "Console mode, no GUI")
+	insecureNoDashboardAuth := flag.Bool(
+		"insecure-no-dashboard-auth",
+		true,
+		"Disable dashboard token login (default: true; set false or "+config.EnvLauncherRequireDashboardAuth+"=1 to require a token)",
+	)
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s Launcher - A web-based configuration editor\n\n", appName)
@@ -79,6 +84,8 @@ func main() {
 		)
 	}
 	flag.Parse()
+
+	insecureNoAuth := (*insecureNoDashboardAuth || config.LauncherInsecureNoAuthEnabled()) && !config.LauncherRequireDashboardAuthEnabled()
 
 	// Initialize logger
 	picoHome := utils.GetPicoclawHome()
@@ -187,6 +194,7 @@ func main() {
 	api.RegisterLauncherAuthRoutes(mux, api.LauncherAuthRouteOpts{
 		DashboardToken: dashboardToken,
 		SessionCookie:  dashboardSessionCookie,
+		InsecureNoAuth: insecureNoAuth,
 		TokenHelp: api.LauncherAuthTokenHelp{
 			EnvVarName:    "PICOCLAW_LAUNCHER_TOKEN",
 			LogFileAbs:    tokenLogFileAbs,
@@ -214,6 +222,7 @@ func main() {
 	dashAuth := middleware.LauncherDashboardAuth(middleware.LauncherDashboardAuthConfig{
 		ExpectedCookie: dashboardSessionCookie,
 		Token:          dashboardToken,
+		SkipAuth:       insecureNoAuth,
 	}, accessControlledMux)
 
 	// Apply middleware stack
@@ -238,7 +247,10 @@ func main() {
 			}
 		}
 		fmt.Println()
-		if newDashTok {
+		if insecureNoAuth {
+			fmt.Println("  WARNING: Dashboard token auth is DISABLED (insecure). Anyone who can reach this port can use the UI.")
+			fmt.Println()
+		} else if newDashTok {
 			fmt.Printf("  Dashboard token (this run): %s\n", dashboardToken)
 		} else if os.Getenv("PICOCLAW_LAUNCHER_TOKEN") != "" {
 			fmt.Printf("  Dashboard token: %s (from PICOCLAW_LAUNCHER_TOKEN)\n", dashboardToken)
@@ -246,10 +258,12 @@ func main() {
 		fmt.Println()
 	}
 
-	if os.Getenv("PICOCLAW_LAUNCHER_TOKEN") != "" {
+	if insecureNoAuth {
+		logger.WarnC("web", "Dashboard token auth disabled ("+config.EnvLauncherInsecureNoAuth+" or -insecure-no-dashboard-auth); do not expose on untrusted networks")
+	} else if os.Getenv("PICOCLAW_LAUNCHER_TOKEN") != "" {
 		logger.InfoC("web", "Dashboard token: environment PICOCLAW_LAUNCHER_TOKEN")
 	}
-	if !enableConsole && newDashTok {
+	if !insecureNoAuth && !enableConsole && newDashTok {
 		logger.InfoC("web", "Dashboard token (this run): "+dashboardToken)
 	}
 
@@ -263,10 +277,10 @@ func main() {
 
 	// Share the local URL with the launcher runtime.
 	serverAddr = fmt.Sprintf("http://localhost:%s", effectivePort)
-	if dashboardToken != "" {
-		browserLaunchURL = serverAddr + "?token=" + url.QueryEscape(dashboardToken)
-	} else {
+	if insecureNoAuth || dashboardToken == "" {
 		browserLaunchURL = serverAddr
+	} else {
+		browserLaunchURL = serverAddr + "?token=" + url.QueryEscape(dashboardToken)
 	}
 
 	// Auto-open browser will be handled by the launcher runtime.

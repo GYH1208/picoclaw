@@ -40,7 +40,14 @@ function LauncherLoginPage() {
     let cancelled = false
     void getLauncherAuthStatus()
       .then((s) => {
-        if (cancelled || s.authenticated || !s.token_help) {
+        if (cancelled) {
+          return
+        }
+        if (s.authenticated) {
+          globalThis.location.assign("/")
+          return
+        }
+        if (!s.token_help) {
           return
         }
         setTokenHelp(s.token_help)

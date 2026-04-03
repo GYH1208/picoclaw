@@ -32,6 +32,8 @@ func SessionCookieValue(signingKey []byte, dashboardToken string) string {
 type LauncherDashboardAuthConfig struct {
 	ExpectedCookie string
 	Token          string
+	// SkipAuth bypasses token and session checks (anyone who can reach the server may use the UI).
+	SkipAuth bool
 	// SecureCookie sets the session cookie's Secure flag. If nil, DefaultLauncherDashboardSecureCookie is used.
 	SecureCookie func(*http.Request) bool
 }
@@ -86,6 +88,10 @@ func ClearLauncherDashboardSessionCookie(w http.ResponseWriter, r *http.Request,
 // before calling next. Public paths are login page and /api/auth/* handlers.
 func LauncherDashboardAuth(cfg LauncherDashboardAuthConfig, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cfg.SkipAuth {
+			next.ServeHTTP(w, r)
+			return
+		}
 		p := canonicalAuthPath(r.URL.Path)
 		if handled := tryLauncherQueryTokenLogin(w, r, p, cfg); handled {
 			return

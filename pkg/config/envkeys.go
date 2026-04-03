@@ -8,6 +8,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sipeed/picoclaw/pkg"
 )
@@ -41,7 +42,37 @@ const (
 	// EnvGatewayHost overrides the host address for the gateway server.
 	// Default: "127.0.0.1"
 	EnvGatewayHost = "PICOCLAW_GATEWAY_HOST"
+
+	// EnvLauncherInsecureNoAuth disables Web Launcher dashboard token authentication when set to a
+	// truthy value (1, true, yes, on). Anyone who can reach the HTTP listener can use the UI and
+	// APIs — unsafe on untrusted networks; do not use with -public on the open internet.
+	EnvLauncherInsecureNoAuth = "PICOCLAW_LAUNCHER_INSECURE_NO_AUTH"
+
+	// EnvLauncherRequireDashboardAuth forces dashboard token login when set to a truthy value
+	// (1, true, yes, on). Overrides the default no-login launcher behavior.
+	EnvLauncherRequireDashboardAuth = "PICOCLAW_LAUNCHER_REQUIRE_DASHBOARD_AUTH"
 )
+
+func truthyEnv(v string) bool {
+	switch strings.TrimSpace(strings.ToLower(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+// LauncherInsecureNoAuthEnabled reports whether dashboard token auth should be disabled for the
+// embedded web launcher (see EnvLauncherInsecureNoAuth).
+func LauncherInsecureNoAuthEnabled() bool {
+	return truthyEnv(os.Getenv(EnvLauncherInsecureNoAuth))
+}
+
+// LauncherRequireDashboardAuthEnabled reports whether dashboard token login is required (see
+// EnvLauncherRequireDashboardAuth).
+func LauncherRequireDashboardAuthEnabled() bool {
+	return truthyEnv(os.Getenv(EnvLauncherRequireDashboardAuth))
+}
 
 func GetHome() string {
 	homePath, _ := os.UserHomeDir()

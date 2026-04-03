@@ -15,6 +15,8 @@ type LauncherAuthRouteOpts struct {
 	DashboardToken string
 	SessionCookie  string
 	SecureCookie   func(*http.Request) bool
+	// InsecureNoAuth makes /api/auth/status report authenticated without a session cookie.
+	InsecureNoAuth bool
 	// TokenHelp is returned on unauthenticated /api/auth/status responses (no secrets).
 	TokenHelp LauncherAuthTokenHelp
 }
@@ -43,11 +45,12 @@ func RegisterLauncherAuthRoutes(mux *http.ServeMux, opts LauncherAuthRouteOpts) 
 		secure = middleware.DefaultLauncherDashboardSecureCookie
 	}
 	h := &launcherAuthHandlers{
-		token:         opts.DashboardToken,
-		sessionCookie: opts.SessionCookie,
-		secureCookie:  secure,
-		tokenHelp:     opts.TokenHelp,
-		loginLimit:    newLoginRateLimiter(),
+		token:            opts.DashboardToken,
+		sessionCookie:    opts.SessionCookie,
+		secureCookie:     secure,
+		insecureNoAuth:   opts.InsecureNoAuth,
+		tokenHelp:        opts.TokenHelp,
+		loginLimit:       newLoginRateLimiter(),
 	}
 	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
@@ -55,11 +58,12 @@ func RegisterLauncherAuthRoutes(mux *http.ServeMux, opts LauncherAuthRouteOpts) 
 }
 
 type launcherAuthHandlers struct {
-	token         string
-	sessionCookie string
-	secureCookie  func(*http.Request) bool
-	tokenHelp     LauncherAuthTokenHelp
-	loginLimit    *loginRateLimiter
+	token            string
+	sessionCookie    string
+	secureCookie     func(*http.Request) bool
+	insecureNoAuth   bool
+	tokenHelp        LauncherAuthTokenHelp
+	loginLimit       *loginRateLimiter
 }
 
 func (h *launcherAuthHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +78,12 @@ func (h *launcherAuthHandlers) handleLogin(w http.ResponseWriter, r *http.Reques
 	if !h.loginLimit.allow(ip) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = w.Write([]byte(`{"error":"too many login attempts"}`))
+		return
+	}
+	if h.insecureNoAuth {
+		middleware.SetLauncherDashboardSessionCookie(w, r, h.sessionCookie, h.secureCookie)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 		return
 	}
 	in := strings.TrimSpace(body.Token)
@@ -120,6 +130,10 @@ func (h *launcherAuthHandlers) handleLogout(w http.ResponseWriter, r *http.Reque
 
 func (h *launcherAuthHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if h.insecureNoAuth {
+		_, _ = w.Write([]byte(`{"authenticated":true}`))
+		return
+	}
 	ok := false
 	if c, err := r.Cookie(middleware.LauncherDashboardCookieName); err == nil {
 		ok = subtle.ConstantTimeCompare([]byte(c.Value), []byte(h.sessionCookie)) == 1

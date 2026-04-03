@@ -160,3 +160,17 @@ func TestLauncherDashboardAuth_CookieAndBearer(t *testing.T) {
 		t.Fatalf("bearer auth: status = %d", rec2.Code)
 	}
 }
+
+func TestLauncherDashboardAuth_SkipAuth(t *testing.T) {
+	cfg := LauncherDashboardAuthConfig{SkipAuth: true, ExpectedCookie: "x", Token: "y"}
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+	h := LauncherDashboardAuth(cfg, next)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTeapot {
+		t.Fatalf("skip auth: status = %d, want %d", rec.Code, http.StatusTeapot)
+	}
+}

@@ -216,3 +216,33 @@ func TestLauncherAuthLogoutRejectsTrailingJSON(t *testing.T) {
 		t.Fatalf("want 400 got %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestLauncherAuthInsecureNoAuth(t *testing.T) {
+	key := make([]byte, 32)
+	sess := middleware.SessionCookieValue(key, "secret")
+	mux := http.NewServeMux()
+	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
+		DashboardToken: "secret",
+		SessionCookie:  sess,
+		InsecureNoAuth: true,
+		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "X"},
+	})
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/auth/status", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"authenticated":true`) {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "token_help") {
+		t.Fatalf("insecure status should omit token_help: %s", rec.Body.String())
+	}
+
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"token":""}`))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.RemoteAddr = "127.0.0.1:12346"
+	mux.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("login code = %d body=%s", rec2.Code, rec2.Body.String())
+	}
+}
