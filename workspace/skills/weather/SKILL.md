@@ -1,6 +1,7 @@
 ---
 name: weather
-description: Get current weather and forecasts with verified location matching (no API key required).
+title: 天气查询
+description: "获取当前天气与预报，经校验的地点匹配（无需 API Key）。"
 homepage: https://wttr.in/:help
 metadata: {"nanobot":{"emoji":"🌤️","requires":{"bins":["curl"]}}}
 ---

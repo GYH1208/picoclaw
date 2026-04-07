@@ -16,8 +16,23 @@ import {
 import { cn } from "@/lib/utils"
 import { refreshGatewayState } from "@/store/gateway"
 
+function useToolCatalogLabels() {
+  const { t, i18n } = useTranslation()
+  return (tool: ToolSupportItem) => {
+    const id = tool.name.toLowerCase()
+    const titleKey = `pages.agent.tools.catalog.${id}.title`
+    const descKey = `pages.agent.tools.catalog.${id}.description`
+    const title = i18n.exists(titleKey) ? t(titleKey) : tool.name
+    const description = i18n.exists(descKey)
+      ? t(descKey)
+      : tool.description
+    return { title, description }
+  }
+}
+
 export function ToolsPage() {
   const { t } = useTranslation()
+  const toolLabels = useToolCatalogLabels()
   const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
     queryKey: ["tools"],
@@ -84,6 +99,8 @@ export function ToolsPage() {
                     </div>
                     <div className="grid gap-4 lg:grid-cols-2">
                       {items.map((tool) => {
+                        const { title: toolTitle, description: toolDesc } =
+                          toolLabels(tool)
                         const reasonText = tool.reason_code
                           ? t(`pages.agent.tools.reasons.${tool.reason_code}`)
                           : ""
@@ -109,11 +126,16 @@ export function ToolsPage() {
                             <CardHeader>
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0 flex-1">
-                                  <CardTitle className="font-mono text-sm break-all">
-                                    {tool.name}
+                                  <CardTitle className="text-sm font-semibold break-words">
+                                    {toolTitle}
                                   </CardTitle>
-                                  <CardDescription className="mt-1 break-words">
-                                    {tool.description}
+                                  {toolTitle !== tool.name ? (
+                                    <div className="text-muted-foreground font-mono text-[11px] leading-snug break-all">
+                                      {tool.name}
+                                    </div>
+                                  ) : null}
+                                  <CardDescription className="mt-1.5 break-words">
+                                    {toolDesc}
                                   </CardDescription>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2 self-start">

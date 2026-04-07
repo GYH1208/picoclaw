@@ -2,6 +2,7 @@ import { launcherFetch } from "@/api/http"
 
 export interface SkillSupportItem {
   name: string
+  title?: string
   path: string
   source: "workspace" | "global" | "builtin" | string
   description: string

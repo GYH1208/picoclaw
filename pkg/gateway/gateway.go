@@ -338,7 +338,7 @@ func setupAndStartServices(
 
 	enabledChannels := runningServices.ChannelManager.GetEnabledChannels()
 	if len(enabledChannels) > 0 {
-		fmt.Printf("✓ Channels enabled: %s\n", enabledChannels)
+		fmt.Printf("✓ Channels enabled: %v\n", channels.LogDisplayNames(enabledChannels))
 	} else {
 		fmt.Println("⚠ Warning: No channels enabled")
 	}
@@ -539,7 +539,7 @@ func restartServices(
 
 	enabledChannels := runningServices.ChannelManager.GetEnabledChannels()
 	if len(enabledChannels) > 0 {
-		fmt.Printf("  ✓ Channels enabled: %s\n", enabledChannels)
+		fmt.Printf("  ✓ Channels enabled: %v\n", channels.LogDisplayNames(enabledChannels))
 	} else {
 		fmt.Println("  ⚠ Warning: No channels enabled")
 	}

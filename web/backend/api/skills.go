@@ -20,6 +20,7 @@ type skillSupportResponse struct {
 
 type skillDetailResponse struct {
 	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
 	Path        string `json:"path"`
 	Source      string `json:"source"`
 	Description string `json:"description"`
@@ -79,6 +80,7 @@ func (h *Handler) handleGetSkill(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(skillDetailResponse{
 			Name:        skill.Name,
+			Title:       skill.Title,
 			Path:        skill.Path,
 			Source:      skill.Source,
 			Description: skill.Description,

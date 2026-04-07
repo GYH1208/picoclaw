@@ -101,7 +101,7 @@
     "version_unknown": "Unknown"
   },
   "credentials": {
-    "description": "Manage OAuth and token-based credentials for supported providers.",
+    "description": "Add sign-in or API keys for each AI provider here. After saving, the assistant can use the corresponding models and services.",
     "loading": "Loading credentials...",
     "providers": {
       "openai": {
@@ -415,7 +415,41 @@
         "loading_detail": "Loading skill content...",
         "load_detail_error": "Failed to load skill content.",
         "path": "Skill Path",
-        "no_description": "No description provided."
+        "no_description": "No description provided.",
+        "catalog": {
+          "agent-browser": {
+            "title": "Agent Browser",
+            "description": "Browser automation via agent-browser CLI. Use when the user needs to navigate websites, fill forms, click buttons, take screenshots, extract data, or test web apps."
+          },
+          "github": {
+            "title": "GitHub",
+            "description": "Interact with GitHub using the `gh` CLI. Use `gh issue`, `gh pr`, `gh run`, and `gh api` for issues, PRs, CI runs, and advanced queries."
+          },
+          "hardware": {
+            "title": "Hardware (I2C / SPI)",
+            "description": "Read and control I2C and SPI peripherals on Sipeed boards (LicheeRV Nano, MaixCAM, NanoKVM)."
+          },
+          "skill-creator": {
+            "title": "Skill Creator",
+            "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets."
+          },
+          "summarize": {
+            "title": "Summarize",
+            "description": "Summarize or extract text/transcripts from URLs, podcasts, and local files (great fallback for \"transcribe this YouTube/video\")."
+          },
+          "tmux": {
+            "title": "tmux",
+            "description": "Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output."
+          },
+          "weather": {
+            "title": "Weather",
+            "description": "Get current weather and forecasts with verified location matching (no API key required)."
+          },
+          "webhook": {
+            "title": "Webhook",
+            "description": "Implement secure webhook receivers and senders with proper verification and reliability."
+          }
+        }
       },
       "tools": {
         "description": "This view reflects whether each agent tool is enabled, disabled, or blocked by a missing prerequisite.",
@@ -425,6 +459,84 @@
         "enable_success": "Tool enabled.",
         "disable_success": "Tool disabled.",
         "toggle_error": "Failed to update tool state.",
+        "catalog": {
+          "read_file": {
+            "title": "Read file",
+            "description": "Read file content from the workspace or explicitly allowed paths."
+          },
+          "write_file": {
+            "title": "Write file",
+            "description": "Create or overwrite files within the writable workspace scope."
+          },
+          "list_dir": {
+            "title": "List directory",
+            "description": "Inspect directories and enumerate files available to the agent."
+          },
+          "edit_file": {
+            "title": "Edit file",
+            "description": "Apply targeted edits to existing files without rewriting everything."
+          },
+          "append_file": {
+            "title": "Append file",
+            "description": "Append content to the end of an existing file."
+          },
+          "exec": {
+            "title": "Exec",
+            "description": "Run shell commands inside the configured workspace sandbox."
+          },
+          "cron": {
+            "title": "Cron",
+            "description": "Schedule one-time or recurring reminders, jobs, and shell commands."
+          },
+          "web_search": {
+            "title": "Web search",
+            "description": "Search the web using the configured providers."
+          },
+          "web_fetch": {
+            "title": "Web fetch",
+            "description": "Fetch and summarize the contents of a webpage."
+          },
+          "message": {
+            "title": "Message",
+            "description": "Send a follow-up message back to the active user or chat."
+          },
+          "send_file": {
+            "title": "Send file",
+            "description": "Send an outbound file or media attachment to the active chat."
+          },
+          "find_skills": {
+            "title": "Find skills",
+            "description": "Search external skill registries for installable skills."
+          },
+          "install_skill": {
+            "title": "Install skill",
+            "description": "Install a skill into the current workspace from a registry."
+          },
+          "spawn": {
+            "title": "Spawn",
+            "description": "Launch a background subagent for long-running or delegated work."
+          },
+          "spawn_status": {
+            "title": "Spawn status",
+            "description": "Query the status of spawned subagents."
+          },
+          "i2c": {
+            "title": "I2C",
+            "description": "Interact with I2C hardware devices exposed on the host."
+          },
+          "spi": {
+            "title": "SPI",
+            "description": "Interact with SPI hardware devices exposed on the host."
+          },
+          "tool_search_tool_regex": {
+            "title": "MCP tool search (regex)",
+            "description": "Discover hidden MCP tools by regex search when tool discovery is enabled."
+          },
+          "tool_search_tool_bm25": {
+            "title": "MCP tool search (semantic)",
+            "description": "Discover hidden MCP tools by semantic ranking when tool discovery is enabled."
+          }
+        },
         "config_key": "Controlled by tools.{{key}}",
         "status": {
           "enabled": "Enabled",

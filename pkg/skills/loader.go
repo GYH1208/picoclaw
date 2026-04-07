@@ -23,15 +23,18 @@ var namePattern = regexp.MustCompile(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`)
 const (
 	MaxNameLength        = 64
 	MaxDescriptionLength = 1024
+	MaxTitleLength       = 128
 )
 
 type SkillMetadata struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Title       string `json:"title"`
 }
 
 type SkillInfo struct {
 	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
 	Path        string `json:"path"`
 	Source      string `json:"source"`
 	Description string `json:"description"`
@@ -54,6 +57,9 @@ func (info SkillInfo) validate() error {
 		errs = errors.Join(errs, errors.New("description is required"))
 	} else if len(info.Description) > MaxDescriptionLength {
 		errs = errors.Join(errs, fmt.Errorf("description exceeds %d character", MaxDescriptionLength))
+	}
+	if info.Title != "" && len(info.Title) > MaxTitleLength {
+		errs = errors.Join(errs, fmt.Errorf("title exceeds %d characters", MaxTitleLength))
 	}
 	return errs
 }
@@ -126,6 +132,7 @@ func (sl *SkillsLoader) ListSkills() []SkillInfo {
 			if metadata != nil {
 				info.Description = metadata.Description
 				info.Name = metadata.Name
+				info.Title = metadata.Title
 			}
 			if err := info.validate(); err != nil {
 				slog.Warn("invalid skill from "+source, "name", info.Name, "error", err)
@@ -247,6 +254,7 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {
 	var jsonMeta struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Title       string `json:"title"`
 	}
 	if err := json.Unmarshal([]byte(frontmatter), &jsonMeta); err == nil {
 		if jsonMeta.Name != "" {
@@ -254,6 +262,9 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {
 		}
 		if jsonMeta.Description != "" {
 			metadata.Description = jsonMeta.Description
+		}
+		if jsonMeta.Title != "" {
+			metadata.Title = jsonMeta.Title
 		}
 		return metadata
 	}
@@ -265,6 +276,9 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath string) *SkillMetadata {
 	}
 	if description := yamlMeta["description"]; description != "" {
 		metadata.Description = description
+	}
+	if title := yamlMeta["title"]; title != "" {
+		metadata.Title = title
 	}
 	return metadata
 }
@@ -330,6 +344,7 @@ func (sl *SkillsLoader) parseSimpleYAML(content string) map[string]string {
 	var meta struct {
 		Name        string `yaml:"name"`
 		Description string `yaml:"description"`
+		Title       string `yaml:"title"`
 	}
 	if err := yaml.Unmarshal([]byte(content), &meta); err != nil {
 		return result
@@ -339,6 +354,9 @@ func (sl *SkillsLoader) parseSimpleYAML(content string) map[string]string {
 	}
 	if meta.Description != "" {
 		result["description"] = meta.Description
+	}
+	if meta.Title != "" {
+		result["title"] = meta.Title
 	}
 
 	return result

@@ -119,7 +119,7 @@ func NewBaseChannel(
 	// acknowledge and permit this (e.g. for a public bot), use ["*"].
 	if len(bc.allowList) == 0 {
 		logger.WarnCF("channels", "SECURITY: Channel allows EVERYONE (allow_from is empty)", map[string]any{
-			"channel": bc.name,
+			"channel": LogDisplayName(bc.name),
 			"hint":    "Set allow_from to your ID, or use '*' to explicitly acknowledge open access.",
 		})
 	}

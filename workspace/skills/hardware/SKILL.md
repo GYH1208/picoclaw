@@ -1,6 +1,7 @@
 ---
 name: hardware
-description: Read and control I2C and SPI peripherals on Sipeed boards (LicheeRV Nano, MaixCAM, NanoKVM).
+title: 硬件（I2C / SPI）
+description: "在矽速开发板（LicheeRV Nano、MaixCAM、NanoKVM）上读写与控制 I2C、SPI 外设。"
 homepage: https://wiki.sipeed.com/hardware/en/lichee/RV_Nano/1_intro.html
 metadata: {"nanobot":{"emoji":"🔧","requires":{"tools":["i2c","spi"]}}}
 ---

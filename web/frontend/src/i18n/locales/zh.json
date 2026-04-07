@@ -101,7 +101,7 @@
     "version_unknown": "未知"
   },
   "credentials": {
-    "description": "管理已支持服务商的 OAuth 与 Token 凭据。",
+    "description": "在此添加各 AI 服务商的登录或 API 密钥，保存后助手才能调用对应模型与服务。",
     "loading": "正在加载凭据...",
     "providers": {
       "openai": {
@@ -415,7 +415,41 @@
         "loading_detail": "正在加载技能内容...",
         "load_detail_error": "加载技能内容失败。",
         "path": "技能路径",
-        "no_description": "未提供描述。"
+        "no_description": "未提供描述。",
+        "catalog": {
+          "agent-browser": {
+            "title": "浏览器自动化",
+            "description": "通过 agent-browser CLI 进行浏览器自动化。在用户需要访问网站、填写表单、点击按钮、截图、提取数据或测试 Web 应用时使用。"
+          },
+          "github": {
+            "title": "GitHub",
+            "description": "使用 `gh` CLI 操作 GitHub。通过 `gh issue`、`gh pr`、`gh run`、`gh api` 处理 Issue、拉取请求、CI 运行与高级查询。"
+          },
+          "hardware": {
+            "title": "硬件（I2C / SPI）",
+            "description": "在矽速开发板（LicheeRV Nano、MaixCAM、NanoKVM）上读写与控制 I2C、SPI 外设。"
+          },
+          "skill-creator": {
+            "title": "技能创建器",
+            "description": "创建或更新 Agent 技能。在设计、整理或打包带脚本、参考资料与资源的技能时使用。"
+          },
+          "summarize": {
+            "title": "内容摘要",
+            "description": "总结或从 URL、播客、本地文件提取文字/转录（适合「转写 YouTube/视频」等需求）。"
+          },
+          "tmux": {
+            "title": "tmux 终端",
+            "description": "通过发送按键与抓取面板输出，远程控制 tmux 会话中的交互式 CLI。"
+          },
+          "weather": {
+            "title": "天气查询",
+            "description": "获取当前天气与预报，经校验的地点匹配（无需 API Key）。"
+          },
+          "webhook": {
+            "title": "Webhook",
+            "description": "实现带校验与可靠性的安全 Webhook 接收与发送。"
+          }
+        }
       },
       "tools": {
         "description": "这里展示每个 Agent 工具当前是已启用、已禁用，还是被依赖条件阻塞。",
@@ -425,6 +459,84 @@
         "enable_success": "工具已启用。",
         "disable_success": "工具已禁用。",
         "toggle_error": "更新工具状态失败。",
+        "catalog": {
+          "read_file": {
+            "title": "读取文件",
+            "description": "从工作区或明确允许的路径读取文件内容。"
+          },
+          "write_file": {
+            "title": "写入文件",
+            "description": "在可写工作区范围内创建或覆盖文件。"
+          },
+          "list_dir": {
+            "title": "列出目录",
+            "description": "查看目录并枚举 Agent 可访问的文件。"
+          },
+          "edit_file": {
+            "title": "编辑文件",
+            "description": "对已有文件做定向修改，而无需整文件重写。"
+          },
+          "append_file": {
+            "title": "追加文件",
+            "description": "在已有文件末尾追加内容。"
+          },
+          "exec": {
+            "title": "执行命令",
+            "description": "在配置的工作区沙箱内运行 Shell 命令。"
+          },
+          "cron": {
+            "title": "定时任务",
+            "description": "安排一次性或重复的提醒、任务与 Shell 命令。"
+          },
+          "web_search": {
+            "title": "网页搜索",
+            "description": "使用已配置的搜索提供方检索网页。"
+          },
+          "web_fetch": {
+            "title": "抓取网页",
+            "description": "获取网页内容并生成摘要。"
+          },
+          "message": {
+            "title": "发送消息",
+            "description": "向当前用户或会话发送后续消息。"
+          },
+          "send_file": {
+            "title": "发送文件",
+            "description": "向当前会话发送出站文件或媒体附件。"
+          },
+          "find_skills": {
+            "title": "查找技能",
+            "description": "在外部技能注册表中搜索可安装的技能。"
+          },
+          "install_skill": {
+            "title": "安装技能",
+            "description": "从注册表将技能安装到当前工作区。"
+          },
+          "spawn": {
+            "title": "子 Agent",
+            "description": "启动后台子 Agent，用于长时间运行或委派任务。"
+          },
+          "spawn_status": {
+            "title": "子 Agent 状态",
+            "description": "查询已启动子 Agent 的状态。"
+          },
+          "i2c": {
+            "title": "I2C 硬件",
+            "description": "与主机上暴露的 I2C 硬件设备交互。"
+          },
+          "spi": {
+            "title": "SPI 硬件",
+            "description": "与主机上暴露的 SPI 硬件设备交互。"
+          },
+          "tool_search_tool_regex": {
+            "title": "MCP 工具搜索（正则）",
+            "description": "在启用工具发现时，通过正则搜索发现隐藏的 MCP 工具。"
+          },
+          "tool_search_tool_bm25": {
+            "title": "MCP 工具搜索（语义）",
+            "description": "在启用工具发现时，通过语义排序发现隐藏的 MCP 工具。"
+          }
+        },
         "config_key": "由 tools.{{key}} 控制",
         "status": {
           "enabled": "已启用",

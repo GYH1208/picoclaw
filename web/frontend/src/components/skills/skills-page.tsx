@@ -47,8 +47,25 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 
+function useSkillCatalogLabels() {
+  const { t, i18n } = useTranslation()
+  return (skill: SkillSupportItem) => {
+    const id = skill.name.toLowerCase()
+    const titleKey = `pages.agent.skills.catalog.${id}.title`
+    const descKey = `pages.agent.skills.catalog.${id}.description`
+    const title = i18n.exists(titleKey)
+      ? t(titleKey)
+      : (skill.title ?? skill.name)
+    const description = i18n.exists(descKey)
+      ? t(descKey)
+      : (skill.description || t("pages.agent.skills.no_description"))
+    return { title, description }
+  }
+}
+
 export function SkillsPage() {
   const { t } = useTranslation()
+  const skillLabels = useSkillCatalogLabels()
   const queryClient = useQueryClient()
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedSkill, setSelectedSkill] = useState<SkillSupportItem | null>(
@@ -166,7 +183,10 @@ export function SkillsPage() {
 
               {data?.skills.length ? (
                 <div className="grid gap-4 lg:grid-cols-2">
-                  {data.skills.map((skill) => (
+                  {data.skills.map((skill) => {
+                    const { title: cardTitle, description: cardDesc } =
+                      skillLabels(skill)
+                    return (
                     <Card
                       key={`${skill.source}:${skill.name}`}
                       className="border-border/60 gap-4"
@@ -176,11 +196,10 @@ export function SkillsPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <CardTitle className="font-semibold">
-                              {skill.name}
+                              {cardTitle}
                             </CardTitle>
                             <CardDescription className="mt-3">
-                              {skill.description ||
-                                t("pages.agent.skills.no_description")}
+                              {cardDesc}
                             </CardDescription>
                           </div>
                           <div className="flex items-center gap-1">
@@ -216,7 +235,8 @@ export function SkillsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <Card className="border-dashed">
@@ -242,11 +262,14 @@ export function SkillsPage() {
         >
           <SheetHeader className="border-b px-6 py-5">
             <SheetTitle>
-              {selectedSkill?.name || t("pages.agent.skills.viewer_title")}
+              {selectedSkill
+                ? skillLabels(selectedSkill).title
+                : t("pages.agent.skills.viewer_title")}
             </SheetTitle>
             <SheetDescription>
-              {selectedSkill?.description ||
-                t("pages.agent.skills.viewer_description")}
+              {selectedSkill
+                ? skillLabels(selectedSkill).description
+                : t("pages.agent.skills.viewer_description")}
             </SheetDescription>
           </SheetHeader>
 
@@ -288,7 +311,9 @@ export function SkillsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t("pages.agent.skills.delete_description", {
-                name: skillPendingDelete?.name,
+                name: skillPendingDelete
+                  ? skillLabels(skillPendingDelete).title
+                  : "",
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>

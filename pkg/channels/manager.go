@@ -414,11 +414,11 @@ func (m *Manager) initChannels(channels *config.ChannelsConfig) error {
 	}
 
 	if channels.Pico.Enabled && channels.Pico.Token.String() != "" {
-		m.initChannel("pico", "Pico")
+		m.initChannel("pico", "TsingPaw")
 	}
 
 	if channels.PicoClient.Enabled && channels.PicoClient.URL != "" {
-		m.initChannel("pico_client", "Pico Client")
+		m.initChannel("pico_client", "TsingPaw Client")
 	}
 
 	if channels.IRC.Enabled && channels.IRC.Server != "" {

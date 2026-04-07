@@ -1,6 +1,7 @@
 ---
 name: agent-browser
-description: "Browser automation via agent-browser CLI. Use when the user needs to navigate websites, fill forms, click buttons, take screenshots, extract data, or test web apps."
+title: 浏览器自动化
+description: "通过 agent-browser CLI 进行浏览器自动化。在用户需要访问网站、填写表单、点击按钮、截图、提取数据或测试 Web 应用时使用。"
 metadata: {"nanobot":{"emoji":"🌐","requires":{"bins":["agent-browser"]},"install":[{"id":"npm","kind":"npm","package":"agent-browser","global":true,"bins":["agent-browser"],"label":"Install agent-browser (npm)"}]}}
 ---
 
