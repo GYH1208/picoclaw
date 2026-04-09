@@ -937,85 +937,64 @@ func TestSupportsPromptCacheKey(t *testing.T) {
 	}
 }
 
-func TestBuildToolsList_NativeSearchAddsWebSearchPreview(t *testing.T) {
-	tools := []ToolDefinition{
-		{Type: "function", Function: ToolFunctionDefinition{Name: "read_file", Description: "read"}},
+func TestSanitizeToolsForChatCompletions_DropsWebSearchPreview(t *testing.T) {
+	body := map[string]any{
+		"model": "gpt-4o",
+		"tools": []any{
+			map[string]any{"type": "function", "function": map[string]any{"name": "read_file"}},
+			map[string]any{"type": "web_search_preview"},
+		},
+		"tool_choice": "auto",
 	}
-	result := buildToolsList(tools, true)
-	if len(result) != 2 {
-		t.Fatalf("len(result) = %d, want 2", len(result))
+	sanitizeToolsForChatCompletions(body)
+	tools := body["tools"].([]any)
+	if len(tools) != 1 {
+		t.Fatalf("len(tools) = %d, want 1", len(tools))
 	}
-	wsEntry, ok := result[1].(map[string]any)
-	if !ok {
-		t.Fatalf("web search entry is %T, want map[string]any", result[1])
-	}
-	if wsEntry["type"] != "web_search_preview" {
-		t.Fatalf("type = %v, want web_search_preview", wsEntry["type"])
+	m := tools[0].(map[string]any)
+	if m["type"] != "function" {
+		t.Fatalf("remaining tool type = %v", m["type"])
 	}
 }
 
-func TestBuildToolsList_NativeSearchFiltersClientWebSearch(t *testing.T) {
+func TestSanitizeToolsForChatCompletions_AllInvalidDropsTools(t *testing.T) {
+	body := map[string]any{
+		"tools":       []any{map[string]any{"type": "web_search_preview"}},
+		"tool_choice": "auto",
+	}
+	sanitizeToolsForChatCompletions(body)
+	if _, ok := body["tools"]; ok {
+		t.Fatal("tools should be removed when empty after sanitize")
+	}
+	if _, ok := body["tool_choice"]; ok {
+		t.Fatal("tool_choice should be removed when no tools")
+	}
+}
+
+func TestBuildToolsList_PassesThrough(t *testing.T) {
 	tools := []ToolDefinition{
 		{Type: "function", Function: ToolFunctionDefinition{Name: "web_search", Description: "search"}},
 		{Type: "function", Function: ToolFunctionDefinition{Name: "read_file", Description: "read"}},
 	}
-	result := buildToolsList(tools, true)
-	for _, entry := range result {
-		if td, ok := entry.(ToolDefinition); ok && strings.EqualFold(td.Function.Name, "web_search") {
-			t.Fatal("client-side web_search should be filtered out when native search is enabled")
-		}
-	}
-	if len(result) != 2 { // read_file + web_search_preview
-		t.Fatalf("len(result) = %d, want 2 (read_file + web_search_preview)", len(result))
-	}
-}
-
-func TestBuildToolsList_NoNativeSearchPassesThrough(t *testing.T) {
-	tools := []ToolDefinition{
-		{Type: "function", Function: ToolFunctionDefinition{Name: "web_search", Description: "search"}},
-		{Type: "function", Function: ToolFunctionDefinition{Name: "read_file", Description: "read"}},
-	}
-	result := buildToolsList(tools, false)
+	result := buildToolsList(tools)
 	if len(result) != 2 {
 		t.Fatalf("len(result) = %d, want 2", len(result))
 	}
 }
 
-func TestIsNativeSearchHost(t *testing.T) {
-	tests := []struct {
-		apiBase string
-		want    bool
-	}{
-		{"https://api.openai.com/v1", true},
-		{"https://myresource.openai.azure.com/openai/deployments/gpt-4", true},
-		{"https://api.mistral.ai/v1", false},
-		{"https://api.deepseek.com/v1", false},
-		{"https://api.groq.com/openai/v1", false},
-		{"http://localhost:11434/v1", false},
-		{"", false},
-	}
-	for _, tt := range tests {
-		if got := isNativeSearchHost(tt.apiBase); got != tt.want {
-			t.Errorf("isNativeSearchHost(%q) = %v, want %v", tt.apiBase, got, tt.want)
+func TestSupportsNativeSearch_AlwaysFalse(t *testing.T) {
+	for _, apiBase := range []string{
+		"https://api.openai.com/v1",
+		"https://api.deepseek.com/v1",
+	} {
+		p := NewProvider("key", apiBase, "")
+		if p.SupportsNativeSearch() {
+			t.Fatalf("SupportsNativeSearch() for %q = true, want false (chat/completions cannot use web_search_preview)", apiBase)
 		}
 	}
 }
 
-func TestSupportsNativeSearch_OpenAI(t *testing.T) {
-	p := NewProvider("key", "https://api.openai.com/v1", "")
-	if !p.SupportsNativeSearch() {
-		t.Fatal("OpenAI provider should support native search")
-	}
-}
-
-func TestSupportsNativeSearch_NonOpenAI(t *testing.T) {
-	p := NewProvider("key", "https://api.deepseek.com/v1", "")
-	if p.SupportsNativeSearch() {
-		t.Fatal("DeepSeek provider should not support native search")
-	}
-}
-
-func TestProviderChat_NativeSearchToolInjected(t *testing.T) {
+func TestProviderChat_NativeSearchOptionDoesNotInjectWebSearchPreview(t *testing.T) {
 	var requestBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1062,16 +1041,22 @@ func TestProviderChat_NativeSearchToolInjected(t *testing.T) {
 	if !ok {
 		t.Fatalf("tools is %T, want []any", requestBody["tools"])
 	}
-	if len(toolsRaw) != 2 {
-		t.Fatalf("len(tools) = %d, want 2 (read_file + web_search_preview)", len(toolsRaw))
+	if len(toolsRaw) != 1 {
+		t.Fatalf("len(tools) = %d, want 1 (read_file only; no web_search_preview)", len(toolsRaw))
 	}
-
-	lastTool, ok := toolsRaw[1].(map[string]any)
-	if !ok {
-		t.Fatalf("last tool is %T, want map[string]any", toolsRaw[1])
+	for _, raw := range toolsRaw {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if m["type"] == "web_search_preview" {
+			t.Fatal("tools must not include web_search_preview on /chat/completions")
+		}
 	}
-	if lastTool["type"] != "web_search_preview" {
-		t.Fatalf("last tool type = %v, want web_search_preview", lastTool["type"])
+	first := toolsRaw[0].(map[string]any)
+	fn := first["function"].(map[string]any)
+	if fn["name"] != "read_file" {
+		t.Fatalf("first tool name = %v, want read_file", fn["name"])
 	}
 }
 
@@ -1120,10 +1105,9 @@ func TestProviderChat_NativeSearchNotInjectedWithoutOption(t *testing.T) {
 	}
 }
 
-// TestProviderChat_NativeSearchIgnoredOnNonOpenAI verifies that when native_search
-// is true in options but the provider's apiBase is not OpenAI (e.g. fallback to DeepSeek),
-// we do not inject web_search_preview to avoid API errors.
-func TestProviderChat_NativeSearchIgnoredOnNonOpenAI(t *testing.T) {
+// TestProviderChat_NativeSearchOptionWithNilTools omits tools when none are registered
+// (native_search in options does not add built-in search for chat/completions).
+func TestProviderChat_NativeSearchOptionWithNilTools(t *testing.T) {
 	var requestBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

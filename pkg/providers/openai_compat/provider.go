@@ -123,11 +123,8 @@ func (p *Provider) buildRequestBody(
 		"messages": common.SerializeMessages(messages),
 	}
 
-	// When fallback uses a different provider (e.g. DeepSeek), that provider must not inject web_search_preview.
-	nativeSearch, _ := options["native_search"].(bool)
-	nativeSearch = nativeSearch && isNativeSearchHost(p.apiBase)
-	if len(tools) > 0 || nativeSearch {
-		requestBody["tools"] = buildToolsList(tools, nativeSearch)
+	if len(tools) > 0 {
+		requestBody["tools"] = buildToolsList(tools)
 		requestBody["tool_choice"] = "auto"
 	}
 
@@ -170,7 +167,54 @@ func (p *Provider) buildRequestBody(
 		requestBody[k] = v
 	}
 
+	// extra_body (or legacy binaries) may attach tools OpenAI Chat Completions
+	// rejects (e.g. type web_search_preview — only "function" and "custom" are valid).
+	sanitizeToolsForChatCompletions(requestBody)
+
 	return requestBody
+}
+
+// sanitizeToolsForChatCompletions removes tool entries that would cause OpenAI
+// /v1/chat/completions to return 400 ("Invalid value: 'web_search_preview'...").
+func sanitizeToolsForChatCompletions(body map[string]any) {
+	raw, ok := body["tools"]
+	if !ok || raw == nil {
+		return
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return
+	}
+	out := make([]any, 0, len(list))
+	for _, item := range list {
+		switch t := item.(type) {
+		case ToolDefinition:
+			if chatCompletionsToolTypeAllowed(t.Type) {
+				out = append(out, item)
+			}
+		case map[string]any:
+			typ, _ := t["type"].(string)
+			if chatCompletionsToolTypeAllowed(typ) {
+				out = append(out, item)
+			}
+		default:
+			out = append(out, item)
+		}
+	}
+	if len(out) == 0 {
+		delete(body, "tools")
+		delete(body, "tool_choice")
+	} else {
+		body["tools"] = out
+	}
+}
+
+func chatCompletionsToolTypeAllowed(toolType string) bool {
+	if toolType == "" {
+		return true
+	}
+	lower := strings.ToLower(toolType)
+	return lower == "function" || lower == "custom"
 }
 
 func (p *Provider) Chat(
@@ -421,31 +465,22 @@ func normalizeModel(model, apiBase string) string {
 	return model
 }
 
-func buildToolsList(tools []ToolDefinition, nativeSearch bool) []any {
-	result := make([]any, 0, len(tools)+1)
+func buildToolsList(tools []ToolDefinition) []any {
+	result := make([]any, 0, len(tools))
 	for _, t := range tools {
-		if nativeSearch && strings.EqualFold(t.Function.Name, "web_search") {
-			continue
-		}
 		result = append(result, t)
-	}
-	if nativeSearch {
-		result = append(result, map[string]any{"type": "web_search_preview"})
 	}
 	return result
 }
 
+// SupportsNativeSearch is always false for this provider. OpenAI's
+// /chat/completions endpoint only accepts tools with type "function" or
+// "custom"; injecting {"type":"web_search_preview"} caused intermittent 400
+// errors ("Invalid value: 'web_search_preview'"). Built-in web search for
+// OpenAI belongs on the Responses API or other integrations — use the
+// client-side web_search tool (tools.web) instead.
 func (p *Provider) SupportsNativeSearch() bool {
-	return isNativeSearchHost(p.apiBase)
-}
-
-func isNativeSearchHost(apiBase string) bool {
-	u, err := url.Parse(apiBase)
-	if err != nil {
-		return false
-	}
-	host := u.Hostname()
-	return host == "api.openai.com" || strings.HasSuffix(host, ".openai.azure.com")
+	return false
 }
 
 // supportsPromptCacheKey reports whether the given API base is known to
