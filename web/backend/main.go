@@ -63,8 +63,8 @@ func main() {
 	console := flag.Bool("console", false, "Console mode, no GUI")
 	insecureNoDashboardAuth := flag.Bool(
 		"insecure-no-dashboard-auth",
-		true,
-		"Disable dashboard token login (default: true; set false or "+config.EnvLauncherRequireDashboardAuth+"=1 to require a token)",
+		false,
+		"Disable dashboard token login (default: false; set true to allow access without a token)",
 	)
 
 	flag.Usage = func() {

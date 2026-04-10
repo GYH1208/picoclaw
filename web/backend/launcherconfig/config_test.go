@@ -77,14 +77,14 @@ func TestValidateRejectsInvalidCIDR(t *testing.T) {
 	}
 }
 
-func TestEnsureDashboardSecrets_GeneratesEphemeral(t *testing.T) {
+func TestEnsureDashboardSecrets_DefaultTokenWhenEnvUnset(t *testing.T) {
 	t.Setenv("PICOCLAW_LAUNCHER_TOKEN", "")
 
 	tok, key, newTok, err := EnsureDashboardSecrets()
 	if err != nil {
 		t.Fatalf("EnsureDashboardSecrets() error = %v", err)
 	}
-	if !newTok || tok == "" || len(key) != dashboardSigningKeyBytes {
+	if !newTok || tok != defaultDashboardToken || len(key) != dashboardSigningKeyBytes {
 		t.Fatalf("unexpected first call: newTok=%v tok=%q keyLen=%d", newTok, tok, len(key))
 	}
 	mac := middleware.SessionCookieValue(key, tok)
@@ -97,10 +97,10 @@ func TestEnsureDashboardSecrets_GeneratesEphemeral(t *testing.T) {
 		t.Fatalf("EnsureDashboardSecrets() second error = %v", err)
 	}
 	if !newTok2 {
-		t.Fatal("second call without env should generate another random token")
+		t.Fatal("second call without env should still report default token path")
 	}
-	if tok2 == tok {
-		t.Fatal("expected a new random dashboard token")
+	if tok2 != tok {
+		t.Fatal("expected stable default dashboard token")
 	}
 	if string(key2) == string(key) {
 		t.Fatal("expected a new signing key")

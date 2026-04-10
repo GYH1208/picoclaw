@@ -2,7 +2,6 @@ package launcherconfig
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -19,8 +18,8 @@ const (
 
 	// dashboardSigningKeyBytes is the HMAC-SHA256 key size (256 bits).
 	dashboardSigningKeyBytes = 32
-	// dashboardTokenEntropyBytes is CSPRNG length before base64 for the per-run dashboard token (256 bits).
-	dashboardTokenEntropyBytes = 32
+	// defaultDashboardToken is used when PICOCLAW_LAUNCHER_TOKEN is not set.
+	defaultDashboardToken = "000000"
 )
 
 // Config stores launch parameters for the web backend service.
@@ -50,7 +49,7 @@ func Validate(cfg Config) error {
 
 // EnsureDashboardSecrets returns signing key bytes and the effective dashboard token for this
 // process. The signing key is freshly random each call; the token comes from the environment
-// variable PICOCLAW_LAUNCHER_TOKEN when set, otherwise a new random token.
+// variable PICOCLAW_LAUNCHER_TOKEN when set, otherwise a default token.
 func EnsureDashboardSecrets() (effectiveToken string, signingKey []byte, newRandomDashboardToken bool, err error) {
 	signingKey = make([]byte, dashboardSigningKeyBytes)
 	if _, err = rand.Read(signingKey); err != nil {
@@ -61,19 +60,7 @@ func EnsureDashboardSecrets() (effectiveToken string, signingKey []byte, newRand
 	if effectiveToken != "" {
 		return effectiveToken, signingKey, false, nil
 	}
-	tok, genErr := randomDashboardToken()
-	if genErr != nil {
-		return "", nil, false, genErr
-	}
-	return tok, signingKey, true, nil
-}
-
-func randomDashboardToken() (string, error) {
-	buf := make([]byte, dashboardTokenEntropyBytes)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
+	return defaultDashboardToken, signingKey, true, nil
 }
 
 // NormalizeCIDRs trims entries, removes empty values, and deduplicates CIDRs.
