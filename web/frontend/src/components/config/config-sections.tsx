@@ -100,9 +100,7 @@ export function AgentDefaultsSection({
         hint={t("pages.config.split_on_marker_hint")}
         layout="setting-row"
         checked={form.splitOnMarker}
-        onCheckedChange={(checked) =>
-          onFieldChange("splitOnMarker", checked)
-        }
+        onCheckedChange={(checked) => onFieldChange("splitOnMarker", checked)}
       />
 
       <SwitchCardField

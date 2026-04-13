@@ -21,8 +21,8 @@ func TestLauncherAuthLoginAndStatus(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, tok)
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: tok,
-		SessionCookie:  sess,
+		DashboardToken: func() string { return tok },
+		SessionCookie:  func() string { return sess },
 		TokenHelp: LauncherAuthTokenHelp{
 			EnvVarName:    "PICOCLAW_LAUNCHER_TOKEN",
 			LogFileAbs:    "/tmp/launcher.log",
@@ -89,8 +89,8 @@ func TestLauncherAuthLogoutRequiresPostAndJSON(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, "tok")
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: "tok",
-		SessionCookie:  sess,
+		DashboardToken: func() string { return "tok" },
+		SessionCookie:  func() string { return sess },
 		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "PICOCLAW_LAUNCHER_TOKEN"},
 	})
 
@@ -123,8 +123,8 @@ func TestLauncherAuthLoginRateLimit(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, tok)
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: tok,
-		SessionCookie:  sess,
+		DashboardToken: func() string { return tok },
+		SessionCookie:  func() string { return sess },
 		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "X"},
 	})
 
@@ -185,8 +185,8 @@ func TestLauncherAuthLogoutEmptyBody(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, "tok")
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: "tok",
-		SessionCookie:  sess,
+		DashboardToken: func() string { return "tok" },
+		SessionCookie:  func() string { return sess },
 		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "X"},
 	})
 	rec := httptest.NewRecorder()
@@ -204,8 +204,8 @@ func TestLauncherAuthLogoutRejectsTrailingJSON(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, "tok")
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: "tok",
-		SessionCookie:  sess,
+		DashboardToken: func() string { return "tok" },
+		SessionCookie:  func() string { return sess },
 		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "X"},
 	})
 	rec := httptest.NewRecorder()
@@ -222,8 +222,8 @@ func TestLauncherAuthInsecureNoAuth(t *testing.T) {
 	sess := middleware.SessionCookieValue(key, "secret")
 	mux := http.NewServeMux()
 	RegisterLauncherAuthRoutes(mux, LauncherAuthRouteOpts{
-		DashboardToken: "secret",
-		SessionCookie:  sess,
+		DashboardToken: func() string { return "secret" },
+		SessionCookie:  func() string { return sess },
 		InsecureNoAuth: true,
 		TokenHelp:      LauncherAuthTokenHelp{EnvVarName: "X"},
 	})

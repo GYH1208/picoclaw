@@ -58,7 +58,7 @@ function useSkillCatalogLabels() {
       : (skill.title ?? skill.name)
     const description = i18n.exists(descKey)
       ? t(descKey)
-      : (skill.description || t("pages.agent.skills.no_description"))
+      : skill.description || t("pages.agent.skills.no_description")
     return { title, description }
   }
 }
@@ -187,54 +187,54 @@ export function SkillsPage() {
                     const { title: cardTitle, description: cardDesc } =
                       skillLabels(skill)
                     return (
-                    <Card
-                      key={`${skill.source}:${skill.name}`}
-                      className="border-border/60 gap-4"
-                      size="sm"
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <CardTitle className="font-semibold">
-                              {cardTitle}
-                            </CardTitle>
-                            <CardDescription className="mt-3">
-                              {cardDesc}
-                            </CardDescription>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-muted-foreground hover:text-foreground"
-                              onClick={() => setSelectedSkill(skill)}
-                              title={t("pages.agent.skills.view")}
-                            >
-                              <IconFileInfo className="size-4" />
-                            </Button>
-                            {skill.source === "workspace" ? (
+                      <Card
+                        key={`${skill.source}:${skill.name}`}
+                        className="border-border/60 gap-4"
+                        size="sm"
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <CardTitle className="font-semibold">
+                                {cardTitle}
+                              </CardTitle>
+                              <CardDescription className="mt-3">
+                                {cardDesc}
+                              </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                className="text-muted-foreground hover:text-destructive"
-                                onClick={() => setSkillPendingDelete(skill)}
-                                title={t("pages.agent.skills.delete")}
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={() => setSelectedSkill(skill)}
+                                title={t("pages.agent.skills.view")}
                               >
-                                <IconTrash className="size-4" />
+                                <IconFileInfo className="size-4" />
                               </Button>
-                            ) : null}
+                              {skill.source === "workspace" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  onClick={() => setSkillPendingDelete(skill)}
+                                  title={t("pages.agent.skills.delete")}
+                                >
+                                  <IconTrash className="size-4" />
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">
-                          {t("pages.agent.skills.path")}
-                        </div>
-                        <div className="bg-muted text-foreground overflow-x-auto rounded-lg px-3 py-2 font-mono text-xs leading-relaxed">
-                          {skill.path}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">
+                            {t("pages.agent.skills.path")}
+                          </div>
+                          <div className="bg-muted text-foreground overflow-x-auto rounded-lg px-3 py-2 font-mono text-xs leading-relaxed">
+                            {skill.path}
+                          </div>
+                        </CardContent>
+                      </Card>
                     )
                   })}
                 </div>

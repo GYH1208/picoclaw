@@ -24,9 +24,10 @@ const (
 
 // Config stores launch parameters for the web backend service.
 type Config struct {
-	Port         int      `json:"port"`
-	Public       bool     `json:"public"`
-	AllowedCIDRs []string `json:"allowed_cidrs,omitempty"`
+	Port           int      `json:"port"`
+	Public         bool     `json:"public"`
+	AllowedCIDRs   []string `json:"allowed_cidrs,omitempty"`
+	DashboardToken string   `json:"dashboard_token,omitempty"`
 }
 
 // Default returns default launcher settings.
@@ -50,13 +51,17 @@ func Validate(cfg Config) error {
 // EnsureDashboardSecrets returns signing key bytes and the effective dashboard token for this
 // process. The signing key is freshly random each call; the token comes from the environment
 // variable PICOCLAW_LAUNCHER_TOKEN when set, otherwise a default token.
-func EnsureDashboardSecrets() (effectiveToken string, signingKey []byte, newRandomDashboardToken bool, err error) {
+func EnsureDashboardSecrets(configToken string) (effectiveToken string, signingKey []byte, newRandomDashboardToken bool, err error) {
 	signingKey = make([]byte, dashboardSigningKeyBytes)
 	if _, err = rand.Read(signingKey); err != nil {
 		return "", nil, false, err
 	}
 
 	effectiveToken = strings.TrimSpace(os.Getenv("PICOCLAW_LAUNCHER_TOKEN"))
+	if effectiveToken != "" {
+		return effectiveToken, signingKey, false, nil
+	}
+	effectiveToken = strings.TrimSpace(configToken)
 	if effectiveToken != "" {
 		return effectiveToken, signingKey, false, nil
 	}

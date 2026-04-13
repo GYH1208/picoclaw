@@ -12,8 +12,8 @@ import (
 
 // LauncherAuthRouteOpts configures dashboard token login handlers.
 type LauncherAuthRouteOpts struct {
-	DashboardToken string
-	SessionCookie  string
+	DashboardToken func() string
+	SessionCookie  func() string
 	SecureCookie   func(*http.Request) bool
 	// InsecureNoAuth makes /api/auth/status report authenticated without a session cookie.
 	InsecureNoAuth bool
@@ -58,8 +58,8 @@ func RegisterLauncherAuthRoutes(mux *http.ServeMux, opts LauncherAuthRouteOpts) 
 }
 
 type launcherAuthHandlers struct {
-	token            string
-	sessionCookie    string
+	token            func() string
+	sessionCookie    func() string
 	secureCookie     func(*http.Request) bool
 	insecureNoAuth   bool
 	tokenHelp        LauncherAuthTokenHelp
@@ -81,19 +81,20 @@ func (h *launcherAuthHandlers) handleLogin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.insecureNoAuth {
-		middleware.SetLauncherDashboardSessionCookie(w, r, h.sessionCookie, h.secureCookie)
+		middleware.SetLauncherDashboardSessionCookie(w, r, h.sessionCookie(), h.secureCookie)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 		return
 	}
 	in := strings.TrimSpace(body.Token)
-	if len(in) != len(h.token) || subtle.ConstantTimeCompare([]byte(in), []byte(h.token)) != 1 {
+	token := h.token()
+	if len(in) != len(token) || subtle.ConstantTimeCompare([]byte(in), []byte(token)) != 1 {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":"invalid token"}`))
 		return
 	}
 
-	middleware.SetLauncherDashboardSessionCookie(w, r, h.sessionCookie, h.secureCookie)
+	middleware.SetLauncherDashboardSessionCookie(w, r, h.sessionCookie(), h.secureCookie)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
@@ -136,7 +137,7 @@ func (h *launcherAuthHandlers) handleStatus(w http.ResponseWriter, r *http.Reque
 	}
 	ok := false
 	if c, err := r.Cookie(middleware.LauncherDashboardCookieName); err == nil {
-		ok = subtle.ConstantTimeCompare([]byte(c.Value), []byte(h.sessionCookie)) == 1
+		ok = subtle.ConstantTimeCompare([]byte(c.Value), []byte(h.sessionCookie())) == 1
 	}
 	if ok {
 		_, _ = w.Write([]byte(`{"authenticated":true}`))

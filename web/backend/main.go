@@ -169,11 +169,12 @@ func main() {
 		logger.Fatalf("Invalid port %q: %v", effectivePort, err)
 	}
 
-	dashboardToken, dashboardSigningKey, newDashTok, dashErr := launcherconfig.EnsureDashboardSecrets()
+	dashboardToken, dashboardSigningKey, newDashTok, dashErr := launcherconfig.EnsureDashboardSecrets(
+		launcherCfg.DashboardToken,
+	)
 	if dashErr != nil {
 		logger.Fatalf("Dashboard auth setup failed: %v", dashErr)
 	}
-	dashboardSessionCookie := middleware.SessionCookieValue(dashboardSigningKey, dashboardToken)
 	launcherDashboardTokenForClipboard = dashboardToken
 
 	// Determine listen address
@@ -192,8 +193,8 @@ func main() {
 		tokenLogFileAbs = filepath.Join(picoHome, logPath, logFile)
 	}
 	api.RegisterLauncherAuthRoutes(mux, api.LauncherAuthRouteOpts{
-		DashboardToken: dashboardToken,
-		SessionCookie:  dashboardSessionCookie,
+		DashboardToken: func() string { return apiHandler.DashboardTokenValue() },
+		SessionCookie:  func() string { return apiHandler.DashboardSessionCookieValue() },
 		InsecureNoAuth: insecureNoAuth,
 		TokenHelp: api.LauncherAuthTokenHelp{
 			EnvVarName:    "PICOCLAW_LAUNCHER_TOKEN",
@@ -205,6 +206,11 @@ func main() {
 
 	// API Routes (e.g. /api/status)
 	apiHandler = api.NewHandler(absPath)
+	apiHandler.SetDashboardAuthState(
+		dashboardSigningKey,
+		dashboardToken,
+		os.Getenv("PICOCLAW_LAUNCHER_TOKEN") != "",
+	)
 	if _, err = apiHandler.EnsurePicoChannel(""); err != nil {
 		logger.ErrorC("web", fmt.Sprintf("Warning: failed to ensure pico channel on startup: %v", err))
 	}
@@ -220,8 +226,8 @@ func main() {
 	}
 
 	dashAuth := middleware.LauncherDashboardAuth(middleware.LauncherDashboardAuthConfig{
-		ExpectedCookie: dashboardSessionCookie,
-		Token:          dashboardToken,
+		ExpectedCookie: func() string { return apiHandler.DashboardSessionCookieValue() },
+		Token:          func() string { return apiHandler.DashboardTokenValue() },
 		SkipAuth:       insecureNoAuth,
 	}, accessControlledMux)
 

@@ -23,7 +23,10 @@ func TestSessionCookieValue_Deterministic(t *testing.T) {
 }
 
 func TestLauncherDashboardAuth_AllowsPublicPaths(t *testing.T) {
-	cfg := LauncherDashboardAuthConfig{ExpectedCookie: "deadbeef", Token: "x"}
+	cfg := LauncherDashboardAuthConfig{
+		ExpectedCookie: func() string { return "deadbeef" },
+		Token:          func() string { return "x" },
+	}
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})
@@ -52,7 +55,10 @@ func TestLauncherDashboardAuth_AllowsPublicPaths(t *testing.T) {
 
 func TestLauncherDashboardAuth_URLTokenBootstrapGET(t *testing.T) {
 	const tok = "secret"
-	cfg := LauncherDashboardAuthConfig{ExpectedCookie: "deadbeef", Token: tok}
+	cfg := LauncherDashboardAuthConfig{
+		ExpectedCookie: func() string { return "deadbeef" },
+		Token:          func() string { return tok },
+	}
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})
@@ -111,7 +117,10 @@ func TestLauncherDashboardAuth_URLTokenBootstrapGET(t *testing.T) {
 }
 
 func TestLauncherDashboardAuth_DotDotCannotBypass(t *testing.T) {
-	cfg := LauncherDashboardAuthConfig{ExpectedCookie: "deadbeef", Token: "x"}
+	cfg := LauncherDashboardAuthConfig{
+		ExpectedCookie: func() string { return "deadbeef" },
+		Token:          func() string { return "x" },
+	}
 	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Fatal("next handler should not run without auth")
 	})
@@ -138,7 +147,10 @@ func TestLauncherDashboardAuth_CookieAndBearer(t *testing.T) {
 	}
 	token := "dashboard-secret-9"
 	cookieVal := SessionCookieValue(key, token)
-	cfg := LauncherDashboardAuthConfig{ExpectedCookie: cookieVal, Token: token}
+	cfg := LauncherDashboardAuthConfig{
+		ExpectedCookie: func() string { return cookieVal },
+		Token:          func() string { return token },
+	}
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -162,7 +174,11 @@ func TestLauncherDashboardAuth_CookieAndBearer(t *testing.T) {
 }
 
 func TestLauncherDashboardAuth_SkipAuth(t *testing.T) {
-	cfg := LauncherDashboardAuthConfig{SkipAuth: true, ExpectedCookie: "x", Token: "y"}
+	cfg := LauncherDashboardAuthConfig{
+		SkipAuth:       true,
+		ExpectedCookie: func() string { return "x" },
+		Token:          func() string { return "y" },
+	}
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})

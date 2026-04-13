@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sipeed/picoclaw/web/backend/middleware"
 	"github.com/sipeed/picoclaw/web/backend/launcherconfig"
 )
 
@@ -111,5 +113,75 @@ func TestPutLauncherConfigRejectsInvalidCIDR(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestPostLauncherTokenPersistsForNextRestart(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	h := NewHandler(configPath)
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read() error = %v", err)
+	}
+	h.SetDashboardAuthState(key, "old-token", false)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/system/launcher-token",
+		strings.NewReader(`{"current_token":"old-token","new_token":"new-token-123"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	cfg, err := launcherconfig.Load(launcherconfig.PathForAppConfig(configPath), launcherconfig.Default())
+	if err != nil {
+		t.Fatalf("launcherconfig.Load() error = %v", err)
+	}
+	if cfg.DashboardToken != "new-token-123" {
+		t.Fatalf("dashboard_token = %q, want %q", cfg.DashboardToken, "new-token-123")
+	}
+	if got := h.DashboardTokenValue(); got != "new-token-123" {
+		t.Fatalf("runtime token = %q, want %q", got, "new-token-123")
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != middleware.LauncherDashboardCookieName {
+		t.Fatalf("cookies = %#v", cookies)
+	}
+	if cookies[0].Value != h.DashboardSessionCookieValue() {
+		t.Fatalf("cookie value = %q, want %q", cookies[0].Value, h.DashboardSessionCookieValue())
+	}
+}
+
+func TestPostLauncherTokenRejectsWhenEnvManaged(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	h := NewHandler(configPath)
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatalf("rand.Read() error = %v", err)
+	}
+	h.SetDashboardAuthState(key, "old-token", true)
+
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/system/launcher-token",
+		strings.NewReader(`{"current_token":"old-token","new_token":"new-token-123"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusConflict, rec.Body.String())
 	}
 }

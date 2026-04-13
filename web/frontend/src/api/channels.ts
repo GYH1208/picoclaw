@@ -1,5 +1,4 @@
 // API client for channels navigation and channel-specific config flows.
-
 import { launcherFetch } from "@/api/http"
 
 export type ChannelConfig = Record<string, unknown>

@@ -80,7 +80,7 @@ func TestValidateRejectsInvalidCIDR(t *testing.T) {
 func TestEnsureDashboardSecrets_DefaultTokenWhenEnvUnset(t *testing.T) {
 	t.Setenv("PICOCLAW_LAUNCHER_TOKEN", "")
 
-	tok, key, newTok, err := EnsureDashboardSecrets()
+	tok, key, newTok, err := EnsureDashboardSecrets("")
 	if err != nil {
 		t.Fatalf("EnsureDashboardSecrets() error = %v", err)
 	}
@@ -92,7 +92,7 @@ func TestEnsureDashboardSecrets_DefaultTokenWhenEnvUnset(t *testing.T) {
 		t.Fatal("empty session mac")
 	}
 
-	tok2, key2, newTok2, err := EnsureDashboardSecrets()
+	tok2, key2, newTok2, err := EnsureDashboardSecrets("")
 	if err != nil {
 		t.Fatalf("EnsureDashboardSecrets() second error = %v", err)
 	}
@@ -110,7 +110,7 @@ func TestEnsureDashboardSecrets_DefaultTokenWhenEnvUnset(t *testing.T) {
 func TestEnsureDashboardSecrets_EnvOverridesGenerated(t *testing.T) {
 	t.Setenv("PICOCLAW_LAUNCHER_TOKEN", "env-only-token-override")
 
-	tok, _, newTok, err := EnsureDashboardSecrets()
+	tok, _, newTok, err := EnsureDashboardSecrets("")
 	if err != nil {
 		t.Fatalf("EnsureDashboardSecrets() error = %v", err)
 	}
@@ -119,6 +119,21 @@ func TestEnsureDashboardSecrets_EnvOverridesGenerated(t *testing.T) {
 	}
 	if newTok {
 		t.Fatal("newRandomDashboardToken should be false when env is set")
+	}
+}
+
+func TestEnsureDashboardSecrets_UsesConfigTokenWhenEnvUnset(t *testing.T) {
+	t.Setenv("PICOCLAW_LAUNCHER_TOKEN", "")
+
+	tok, _, newTok, err := EnsureDashboardSecrets("file-token-override")
+	if err != nil {
+		t.Fatalf("EnsureDashboardSecrets() error = %v", err)
+	}
+	if tok != "file-token-override" {
+		t.Fatalf("token = %q, want config value", tok)
+	}
+	if newTok {
+		t.Fatal("newRandomDashboardToken should be false when config token is set")
 	}
 }
 

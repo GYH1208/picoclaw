@@ -96,7 +96,7 @@ export function AppHeader() {
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
           <Link
             to="/"
-            className="flex items-center gap-2 rounded-md outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+            className="ring-offset-background focus-visible:ring-ring flex items-center gap-2 rounded-md outline-none focus-visible:ring-2"
           >
             <img
               className="h-8 w-8 shrink-0 object-contain"

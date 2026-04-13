@@ -7,11 +7,13 @@ import { toast } from "sonner"
 
 import { patchAppConfig } from "@/api/channels"
 import { launcherFetch } from "@/api/http"
+import { postLauncherDashboardLogout } from "@/api/launcher-auth"
 import {
   getAutoStartStatus,
   getLauncherConfig,
   setAutoStartEnabled as updateAutoStartEnabled,
   setLauncherConfig as updateLauncherConfig,
+  updateLauncherToken,
 } from "@/api/system"
 import {
   AgentDefaultsSection,
@@ -33,6 +35,9 @@ import {
 } from "@/components/config/form-model"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { refreshGatewayState } from "@/store/gateway"
 
 export function ConfigPage() {
@@ -47,6 +52,10 @@ export function ConfigPage() {
   const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [autoStartBaseline, setAutoStartBaseline] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [currentLauncherToken, setCurrentLauncherToken] = useState("")
+  const [newLauncherToken, setNewLauncherToken] = useState("")
+  const [confirmLauncherToken, setConfirmLauncherToken] = useState("")
+  const [savingLauncherToken, setSavingLauncherToken] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["config"],
@@ -293,6 +302,50 @@ export function ConfigPage() {
     }
   }
 
+  const handleSaveLauncherToken = async () => {
+    const currentToken = currentLauncherToken.trim()
+    const nextToken = newLauncherToken.trim()
+    const confirmToken = confirmLauncherToken.trim()
+    if (!currentToken) {
+      toast.error(t("pages.config.launcher_token_current_required"))
+      return
+    }
+    if (!nextToken) {
+      toast.error(t("pages.config.launcher_token_new_required"))
+      return
+    }
+    if (nextToken.length < 6) {
+      toast.error(t("pages.config.launcher_token_min_length"))
+      return
+    }
+    if (nextToken !== confirmToken) {
+      toast.error(t("pages.config.launcher_token_confirm_mismatch"))
+      return
+    }
+
+    try {
+      setSavingLauncherToken(true)
+      await updateLauncherToken({
+        current_token: currentToken,
+        new_token: nextToken,
+      })
+      setCurrentLauncherToken("")
+      setNewLauncherToken("")
+      setConfirmLauncherToken("")
+      toast.success(t("pages.config.launcher_token_update_success"))
+      await postLauncherDashboardLogout()
+      globalThis.location.assign("/launcher-login")
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t("pages.config.launcher_token_update_error"),
+      )
+    } finally {
+      setSavingLauncherToken(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader
@@ -337,6 +390,68 @@ export function ConfigPage() {
                 onFieldChange={updateLauncherField}
                 disabled={saving || isLauncherLoading}
               />
+
+              <Card size="sm">
+                <CardHeader className="border-border border-b">
+                  <CardTitle>
+                    {t("pages.config.launcher_token_title")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-4">
+                  <p className="text-muted-foreground text-sm">
+                    {t("pages.config.launcher_token_hint")}
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="launcher-token-current">
+                      {t("pages.config.launcher_token_current")}
+                    </Label>
+                    <Input
+                      id="launcher-token-current"
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentLauncherToken}
+                      onChange={(e) => setCurrentLauncherToken(e.target.value)}
+                      disabled={savingLauncherToken}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="launcher-token-new">
+                      {t("pages.config.launcher_token_new")}
+                    </Label>
+                    <Input
+                      id="launcher-token-new"
+                      type="password"
+                      autoComplete="new-password"
+                      value={newLauncherToken}
+                      onChange={(e) => setNewLauncherToken(e.target.value)}
+                      disabled={savingLauncherToken}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="launcher-token-confirm">
+                      {t("pages.config.launcher_token_confirm")}
+                    </Label>
+                    <Input
+                      id="launcher-token-confirm"
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmLauncherToken}
+                      onChange={(e) => setConfirmLauncherToken(e.target.value)}
+                      disabled={savingLauncherToken}
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSaveLauncherToken}
+                      disabled={savingLauncherToken}
+                    >
+                      {savingLauncherToken
+                        ? t("common.saving")
+                        : t("pages.config.launcher_token_save")}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               <DevicesSection
                 form={form}

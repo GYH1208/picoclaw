@@ -20,6 +20,16 @@ export interface SystemVersionInfo {
   go_version: string
 }
 
+export interface UpdateLauncherTokenPayload {
+  current_token: string
+  new_token: string
+}
+
+export interface UpdateLauncherTokenResponse {
+  status: string
+  apply_on_restart: boolean
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await launcherFetch(path, options)
   if (!res.ok) {
@@ -72,4 +82,14 @@ export async function setLauncherConfig(
 
 export async function getSystemVersionInfo(): Promise<SystemVersionInfo> {
   return request<SystemVersionInfo>("/api/system/version")
+}
+
+export async function updateLauncherToken(
+  payload: UpdateLauncherTokenPayload,
+): Promise<UpdateLauncherTokenResponse> {
+  return request<UpdateLauncherTokenResponse>("/api/system/launcher-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
 }

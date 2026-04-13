@@ -23,9 +23,7 @@ function useToolCatalogLabels() {
     const titleKey = `pages.agent.tools.catalog.${id}.title`
     const descKey = `pages.agent.tools.catalog.${id}.description`
     const title = i18n.exists(titleKey) ? t(titleKey) : tool.name
-    const description = i18n.exists(descKey)
-      ? t(descKey)
-      : tool.description
+    const description = i18n.exists(descKey) ? t(descKey) : tool.description
     return { title, description }
   }
 }

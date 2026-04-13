@@ -30,8 +30,8 @@ func SessionCookieValue(signingKey []byte, dashboardToken string) string {
 
 // LauncherDashboardAuthConfig holds runtime material for dashboard access checks.
 type LauncherDashboardAuthConfig struct {
-	ExpectedCookie string
-	Token          string
+	ExpectedCookie func() string
+	Token          func() string
 	// SkipAuth bypasses token and session checks (anyone who can reach the server may use the UI).
 	SkipAuth bool
 	// SecureCookie sets the session cookie's Secure flag. If nil, DefaultLauncherDashboardSecureCookie is used.
@@ -130,11 +130,12 @@ func tryLauncherQueryTokenLogin(
 	if qToken == "" {
 		return false
 	}
-	if len(qToken) != len(cfg.Token) || subtle.ConstantTimeCompare([]byte(qToken), []byte(cfg.Token)) != 1 {
+	token := cfg.Token()
+	if len(qToken) != len(token) || subtle.ConstantTimeCompare([]byte(qToken), []byte(token)) != 1 {
 		rejectLauncherDashboardAuth(w, r, canonicalPath)
 		return true
 	}
-	SetLauncherDashboardSessionCookie(w, r, cfg.ExpectedCookie, cfg.SecureCookie)
+	SetLauncherDashboardSessionCookie(w, r, cfg.ExpectedCookie(), cfg.SecureCookie)
 	http.Redirect(w, r, redirectAfterQueryTokenLogin(r, canonicalPath), http.StatusSeeOther)
 	return true
 }
@@ -206,7 +207,7 @@ func isPublicLauncherDashboardStatic(method, p string) bool {
 
 func validLauncherDashboardAuth(r *http.Request, cfg LauncherDashboardAuthConfig) bool {
 	if c, err := r.Cookie(LauncherDashboardCookieName); err == nil {
-		if subtle.ConstantTimeCompare([]byte(c.Value), []byte(cfg.ExpectedCookie)) == 1 {
+		if subtle.ConstantTimeCompare([]byte(c.Value), []byte(cfg.ExpectedCookie())) == 1 {
 			return true
 		}
 	}
@@ -214,7 +215,8 @@ func validLauncherDashboardAuth(r *http.Request, cfg LauncherDashboardAuthConfig
 	const prefix = "Bearer "
 	if strings.HasPrefix(auth, prefix) {
 		token := strings.TrimSpace(auth[len(prefix):])
-		if len(token) == len(cfg.Token) && subtle.ConstantTimeCompare([]byte(token), []byte(cfg.Token)) == 1 {
+		currentToken := cfg.Token()
+		if len(token) == len(currentToken) && subtle.ConstantTimeCompare([]byte(token), []byte(currentToken)) == 1 {
 			return true
 		}
 	}
