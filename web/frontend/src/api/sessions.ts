@@ -50,3 +50,18 @@ export async function deleteSession(id: string): Promise<void> {
     throw new Error(`Failed to delete session ${id}: ${res.status}`)
   }
 }
+
+export async function patchSessionTitle(
+  id: string,
+  title: string,
+): Promise<SessionSummary> {
+  const res = await launcherFetch(`/api/sessions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to rename session ${id}: ${res.status}`)
+  }
+  return res.json() as Promise<SessionSummary>
+}

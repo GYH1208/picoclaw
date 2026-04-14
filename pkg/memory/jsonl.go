@@ -34,12 +34,13 @@ const (
 
 // sessionMeta holds per-session metadata stored in a .meta.json file.
 type sessionMeta struct {
-	Key       string    `json:"key"`
-	Summary   string    `json:"summary"`
-	Skip      int       `json:"skip"`
-	Count     int       `json:"count"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Key         string    `json:"key"`
+	Summary     string    `json:"summary"`
+	CustomTitle string    `json:"custom_title,omitempty"`
+	Skip        int       `json:"skip"`
+	Count       int       `json:"count"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // JSONLStore implements Store using append-only JSONL files.

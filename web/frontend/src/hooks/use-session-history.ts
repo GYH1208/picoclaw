@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import { type SessionSummary, deleteSession, getSessions } from "@/api/sessions"
+import {
+  type SessionSummary,
+  deleteSession,
+  getSessions,
+  patchSessionTitle,
+} from "@/api/sessions"
+import { toast } from "sonner"
 
 const LIMIT = 20
 
@@ -100,6 +106,21 @@ export function useSessionHistory({
     [activeSessionId, onDeletedActiveSession],
   )
 
+  const handleRenameSession = useCallback(
+    async (id: string, title: string) => {
+      try {
+        const updated = await patchSessionTitle(id, title)
+        setSessions((prev) =>
+          prev.map((s) => (s.id === id ? updated : s)),
+        )
+      } catch (err) {
+        console.error("Failed to rename session:", err)
+        toast.error(t("chat.renameSessionFailed"))
+      }
+    },
+    [t],
+  )
+
   return {
     sessions,
     hasMore,
@@ -108,5 +129,6 @@ export function useSessionHistory({
     observerRef,
     loadSessions,
     handleDeleteSession,
+    handleRenameSession,
   }
 }

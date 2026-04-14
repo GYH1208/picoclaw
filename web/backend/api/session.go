@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sipeed/picoclaw/pkg/config"
+	"github.com/sipeed/picoclaw/pkg/fileutil"
 	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
@@ -20,16 +21,18 @@ import (
 func (h *Handler) registerSessionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/sessions", h.handleListSessions)
 	mux.HandleFunc("GET /api/sessions/{id}", h.handleGetSession)
+	mux.HandleFunc("PATCH /api/sessions/{id}", h.handlePatchSession)
 	mux.HandleFunc("DELETE /api/sessions/{id}", h.handleDeleteSession)
 }
 
 // sessionFile mirrors the on-disk session JSON structure from pkg/session.
 type sessionFile struct {
-	Key      string              `json:"key"`
-	Messages []providers.Message `json:"messages"`
-	Summary  string              `json:"summary,omitempty"`
-	Created  time.Time           `json:"created"`
-	Updated  time.Time           `json:"updated"`
+	Key         string              `json:"key"`
+	Messages    []providers.Message `json:"messages"`
+	Summary     string              `json:"summary,omitempty"`
+	CustomTitle string              `json:"custom_title,omitempty"`
+	Created     time.Time           `json:"created"`
+	Updated     time.Time           `json:"updated"`
 }
 
 // sessionListItem is a lightweight summary returned by GET /api/sessions.
@@ -43,12 +46,13 @@ type sessionListItem struct {
 }
 
 type sessionMetaFile struct {
-	Key       string    `json:"key"`
-	Summary   string    `json:"summary"`
-	Skip      int       `json:"skip"`
-	Count     int       `json:"count"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Key         string    `json:"key"`
+	Summary     string    `json:"summary"`
+	CustomTitle string    `json:"custom_title,omitempty"`
+	Skip        int       `json:"skip"`
+	Count       int       `json:"count"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // picoSessionPrefix is the key prefix used by the gateway's routing for Pico
@@ -119,6 +123,18 @@ func (h *Handler) readSessionMeta(path, sessionKey string) (sessionMetaFile, err
 	return meta, nil
 }
 
+func (h *Handler) writeSessionMeta(metaPath, sessionKey string, meta sessionMetaFile) error {
+	if meta.Key == "" {
+		meta.Key = sessionKey
+	}
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return fileutil.WriteFileAtomic(metaPath, data, 0o644)
+}
+
 func (h *Handler) readSessionMessages(path string, skip int) ([]providers.Message, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -184,11 +200,12 @@ func (h *Handler) readJSONLSession(dir, sessionID string) (sessionFile, error) {
 	}
 
 	return sessionFile{
-		Key:      meta.Key,
-		Messages: messages,
-		Summary:  meta.Summary,
-		Created:  created,
-		Updated:  updated,
+		Key:         meta.Key,
+		Messages:    messages,
+		Summary:     meta.Summary,
+		CustomTitle: meta.CustomTitle,
+		Created:     created,
+		Updated:     updated,
 	}, nil
 }
 
@@ -200,7 +217,10 @@ func buildSessionListItem(sessionID string, sess sessionFile) sessionListItem {
 			break
 		}
 	}
-	title := strings.TrimSpace(sess.Summary)
+	title := strings.TrimSpace(sess.CustomTitle)
+	if title == "" {
+		title = strings.TrimSpace(sess.Summary)
+	}
 	if title == "" {
 		title = preview
 	}
@@ -462,6 +482,98 @@ func (h *Handler) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		"created":  sess.Created.Format(time.RFC3339),
 		"updated":  sess.Updated.Format(time.RFC3339),
 	})
+}
+
+type patchSessionPayload struct {
+	Title string `json:"title"`
+}
+
+// handlePatchSession updates the user-visible title for a session (stored as custom_title in meta).
+//
+//	PATCH /api/sessions/{id}
+//	Body: { "title": "..." } — empty string clears the custom title and restores auto summary/preview.
+func (h *Handler) handlePatchSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	if sessionID == "" {
+		http.Error(w, "missing session id", http.StatusBadRequest)
+		return
+	}
+
+	var payload patchSessionPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	title := truncateRunes(strings.TrimSpace(payload.Title), maxSessionTitleRunes)
+
+	dir, err := h.sessionsDir()
+	if err != nil {
+		http.Error(w, "failed to resolve sessions directory", http.StatusInternalServerError)
+		return
+	}
+
+	sessionKey := picoSessionPrefix + sessionID
+	base := filepath.Join(dir, sanitizeSessionKey(sessionKey))
+	jsonlPath := base + ".jsonl"
+	metaPath := base + ".meta.json"
+	legacyPath := base + ".json"
+
+	if _, statErr := os.Stat(jsonlPath); statErr == nil {
+		meta, metaErr := h.readSessionMeta(metaPath, sessionKey)
+		if metaErr != nil {
+			http.Error(w, "failed to read session metadata", http.StatusInternalServerError)
+			return
+		}
+		now := time.Now()
+		if meta.CreatedAt.IsZero() {
+			meta.CreatedAt = now
+		}
+		meta.CustomTitle = title
+		meta.UpdatedAt = now
+		if err := h.writeSessionMeta(metaPath, sessionKey, meta); err != nil {
+			http.Error(w, "failed to save session metadata", http.StatusInternalServerError)
+			return
+		}
+		sess, loadErr := h.readJSONLSession(dir, sessionID)
+		if loadErr != nil {
+			http.Error(w, "failed to reload session", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(buildSessionListItem(sessionID, sess))
+		return
+	}
+
+	if _, statErr := os.Stat(legacyPath); statErr == nil {
+		data, readErr := os.ReadFile(legacyPath)
+		if readErr != nil {
+			http.Error(w, "failed to read session", http.StatusInternalServerError)
+			return
+		}
+		var sess sessionFile
+		if err := json.Unmarshal(data, &sess); err != nil {
+			http.Error(w, "failed to parse session", http.StatusInternalServerError)
+			return
+		}
+		now := time.Now()
+		sess.CustomTitle = title
+		sess.Updated = now
+		out, encErr := json.MarshalIndent(sess, "", "  ")
+		if encErr != nil {
+			http.Error(w, "failed to encode session", http.StatusInternalServerError)
+			return
+		}
+		out = append(out, '\n')
+		if err := fileutil.WriteFileAtomic(legacyPath, out, 0o644); err != nil {
+			http.Error(w, "failed to save session", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(buildSessionListItem(sessionID, sess))
+		return
+	}
+
+	http.Error(w, "session not found", http.StatusNotFound)
 }
 
 // handleDeleteSession deletes a specific session.

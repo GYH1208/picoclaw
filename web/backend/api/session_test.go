@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sipeed/picoclaw/pkg/config"
@@ -318,5 +319,91 @@ func TestHandleSessions_FiltersEmptyJSONLFiles(t *testing.T) {
 
 	if detailRec.Code != http.StatusNotFound {
 		t.Fatalf("detail status = %d, want %d, body=%s", detailRec.Code, http.StatusNotFound, detailRec.Body.String())
+	}
+}
+
+func TestHandlePatchSession_JSONLStorage(t *testing.T) {
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	dir := sessionsTestDir(t, configPath)
+	store, err := memory.NewJSONLStore(dir)
+	if err != nil {
+		t.Fatalf("NewJSONLStore() error = %v", err)
+	}
+
+	sessionKey := picoSessionPrefix + "patch-jsonl"
+	if err := store.AddFullMessage(nil, sessionKey, providers.Message{
+		Role:    "user",
+		Content: "hello",
+	}); err != nil {
+		t.Fatalf("AddFullMessage() error = %v", err)
+	}
+	if err := store.SetSummary(nil, sessionKey, "auto summary"); err != nil {
+		t.Fatalf("SetSummary() error = %v", err)
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	patchReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/sessions/patch-jsonl",
+		strings.NewReader(`{"title":"My custom title"}`),
+	)
+	patchReq.Header.Set("Content-Type", "application/json")
+	patchRec := httptest.NewRecorder()
+	mux.ServeHTTP(patchRec, patchReq)
+
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("PATCH status = %d, want %d, body=%s", patchRec.Code, http.StatusOK, patchRec.Body.String())
+	}
+
+	var patched sessionListItem
+	if err := json.Unmarshal(patchRec.Body.Bytes(), &patched); err != nil {
+		t.Fatalf("Unmarshal(PATCH) error = %v", err)
+	}
+	if patched.Title != "My custom title" {
+		t.Fatalf("patched.Title = %q, want %q", patched.Title, "My custom title")
+	}
+
+	listRec := httptest.NewRecorder()
+	listReq := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("GET list status = %d", listRec.Code)
+	}
+	var items []sessionListItem
+	if err := json.Unmarshal(listRec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("Unmarshal(list) error = %v", err)
+	}
+	var listTitle string
+	for _, it := range items {
+		if it.ID == "patch-jsonl" {
+			listTitle = it.Title
+			break
+		}
+	}
+	if listTitle != "My custom title" {
+		t.Fatalf("list title = %q, want %q", listTitle, "My custom title")
+	}
+
+	clearReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/api/sessions/patch-jsonl",
+		strings.NewReader(`{"title":""}`),
+	)
+	clearReq.Header.Set("Content-Type", "application/json")
+	clearRec := httptest.NewRecorder()
+	mux.ServeHTTP(clearRec, clearReq)
+	if clearRec.Code != http.StatusOK {
+		t.Fatalf("PATCH clear status = %d, body=%s", clearRec.Code, clearRec.Body.String())
+	}
+	if err := json.Unmarshal(clearRec.Body.Bytes(), &patched); err != nil {
+		t.Fatalf("Unmarshal(PATCH clear) error = %v", err)
+	}
+	if patched.Title != "auto summary" {
+		t.Fatalf("after clear, Title = %q, want %q", patched.Title, "auto summary")
 	}
 }
