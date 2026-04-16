@@ -323,10 +323,24 @@ func (h *Handler) handleSetDefaultModel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	restarted := false
+	restartPID := 0
+	statusData := h.gatewayStatusData()
+	if gatewayStatus, _ := statusData["gateway_status"].(string); gatewayStatus == "running" {
+		restartPID, err = h.RestartGateway()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to restart gateway after default model change: %v", err), http.StatusInternalServerError)
+			return
+		}
+		restarted = true
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]any{
 		"status":        "ok",
 		"default_model": req.ModelName,
+		"restarted":     restarted,
+		"pid":           restartPID,
 	})
 }
 
