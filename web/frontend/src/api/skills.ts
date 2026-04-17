@@ -22,6 +22,9 @@ interface SkillActionResponse {
   path?: string
   source?: string
   description?: string
+  warnings?: string[]
+  documentationWarnings?: string[]
+  reviewWarnings?: string[]
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -40,9 +43,21 @@ export async function getSkill(name: string): Promise<SkillDetailResponse> {
   return request<SkillDetailResponse>(`/api/skills/${encodeURIComponent(name)}`)
 }
 
-export async function importSkill(file: File): Promise<SkillActionResponse> {
+export async function importSkill(input: {
+  file?: File
+  files?: File[]
+}): Promise<SkillActionResponse> {
   const formData = new FormData()
-  formData.set("file", file)
+  if (input.file) {
+    formData.set("file", input.file)
+  } else if (input.files?.length) {
+    for (const file of input.files) {
+      formData.append("files", file, file.name)
+      formData.append("paths", file.webkitRelativePath || file.name)
+    }
+  } else {
+    throw new Error("No skill file selected")
+  }
 
   const res = await launcherFetch("/api/skills/import", {
     method: "POST",
