@@ -170,6 +170,7 @@ func (p *Provider) buildRequestBody(
 	// extra_body (or legacy binaries) may attach tools OpenAI Chat Completions
 	// rejects (e.g. type web_search_preview — only "function" and "custom" are valid).
 	sanitizeToolsForChatCompletions(requestBody)
+	sanitizeTokenLimitFields(requestBody)
 
 	return requestBody
 }
@@ -215,6 +216,21 @@ func chatCompletionsToolTypeAllowed(toolType string) bool {
 	}
 	lower := strings.ToLower(toolType)
 	return lower == "function" || lower == "custom"
+}
+
+func sanitizeTokenLimitFields(body map[string]any) {
+	maxTokens, hasMaxTokens := body["max_tokens"]
+	maxCompletionTokens, hasMaxCompletionTokens := body["max_completion_tokens"]
+
+	if hasMaxTokens && hasMaxCompletionTokens {
+		if maxCompletionTokens != nil {
+			delete(body, "max_tokens")
+			return
+		}
+		if maxTokens != nil {
+			delete(body, "max_completion_tokens")
+		}
+	}
 }
 
 func (p *Provider) Chat(

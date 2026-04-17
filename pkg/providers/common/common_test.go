@@ -144,6 +144,67 @@ func TestSerializeMessages_MediaWithToolCallID(t *testing.T) {
 	}
 }
 
+func TestSerializeMessages_ToolCallsStripProviderSpecificMetadata(t *testing.T) {
+	messages := []Message{
+		{
+			Role:    "assistant",
+			Content: "",
+			ToolCalls: []ToolCall{
+				{
+					ID:   "call_1",
+					Type: "function",
+					Name: "test_tool",
+					Function: &FunctionCall{
+						Name:             "test_tool",
+						Arguments:        `{"foo":"bar"}`,
+						ThoughtSignature: "sig123",
+					},
+					ExtraContent: &ExtraContent{
+						Google: &GoogleExtra{ThoughtSignature: "sig123"},
+					},
+				},
+			},
+		},
+	}
+
+	result := SerializeMessages(messages)
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	raw := string(data)
+	if strings.Contains(raw, "extra_content") {
+		t.Fatalf("serialized messages should not include extra_content, got %s", raw)
+	}
+	if strings.Contains(raw, "thought_signature") {
+		t.Fatalf("serialized messages should not include thought_signature, got %s", raw)
+	}
+
+	var msgs []map[string]any
+	if err := json.Unmarshal(data, &msgs); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	toolCalls, ok := msgs[0]["tool_calls"].([]any)
+	if !ok || len(toolCalls) != 1 {
+		t.Fatalf("tool_calls = %T/%v, want one entry", msgs[0]["tool_calls"], msgs[0]["tool_calls"])
+	}
+	toolCall, ok := toolCalls[0].(map[string]any)
+	if !ok {
+		t.Fatalf("tool call is %T, want map[string]any", toolCalls[0])
+	}
+	function, ok := toolCall["function"].(map[string]any)
+	if !ok {
+		t.Fatalf("function is %T, want map[string]any", toolCall["function"])
+	}
+	if function["name"] != "test_tool" {
+		t.Fatalf("function.name = %v, want test_tool", function["name"])
+	}
+	if function["arguments"] != `{"foo":"bar"}` {
+		t.Fatalf("function.arguments = %v, want JSON string", function["arguments"])
+	}
+}
+
 func TestSerializeMessages_StripsSystemParts(t *testing.T) {
 	messages := []Message{
 		{

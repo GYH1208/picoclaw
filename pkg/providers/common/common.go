@@ -73,8 +73,19 @@ type openaiMessage struct {
 	Role             string     `json:"role"`
 	Content          string     `json:"content"`
 	ReasoningContent string     `json:"reasoning_content,omitempty"`
-	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+	ToolCalls        []openaiToolCall `json:"tool_calls,omitempty"`
 	ToolCallID       string     `json:"tool_call_id,omitempty"`
+}
+
+type openaiToolCall struct {
+	ID       string              `json:"id"`
+	Type     string              `json:"type,omitempty"`
+	Function *openaiFunctionCall `json:"function,omitempty"`
+}
+
+type openaiFunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 // SerializeMessages converts internal Message structs to the OpenAI wire format.
@@ -84,12 +95,13 @@ type openaiMessage struct {
 func SerializeMessages(messages []Message) []any {
 	out := make([]any, 0, len(messages))
 	for _, m := range messages {
+		toolCalls := serializeToolCalls(m.ToolCalls)
 		if len(m.Media) == 0 {
 			out = append(out, openaiMessage{
 				Role:             m.Role,
 				Content:          m.Content,
 				ReasoningContent: m.ReasoningContent,
-				ToolCalls:        m.ToolCalls,
+				ToolCalls:        toolCalls,
 				ToolCallID:       m.ToolCallID,
 			})
 			continue
@@ -132,14 +144,58 @@ func SerializeMessages(messages []Message) []any {
 		if m.ToolCallID != "" {
 			msg["tool_call_id"] = m.ToolCallID
 		}
-		if len(m.ToolCalls) > 0 {
-			msg["tool_calls"] = m.ToolCalls
+		if len(toolCalls) > 0 {
+			msg["tool_calls"] = toolCalls
 		}
 		if m.ReasoningContent != "" {
 			msg["reasoning_content"] = m.ReasoningContent
 		}
 		out = append(out, msg)
 	}
+	return out
+}
+
+func serializeToolCalls(toolCalls []ToolCall) []openaiToolCall {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
+	out := make([]openaiToolCall, 0, len(toolCalls))
+	for _, tc := range toolCalls {
+		wireCall := openaiToolCall{
+			ID:   tc.ID,
+			Type: tc.Type,
+		}
+		if wireCall.Type == "" {
+			wireCall.Type = "function"
+		}
+
+		name := tc.Name
+		arguments := "{}"
+		if tc.Function != nil {
+			if name == "" {
+				name = tc.Function.Name
+			}
+			if strings.TrimSpace(tc.Function.Arguments) != "" {
+				arguments = tc.Function.Arguments
+			}
+		}
+		if name == "" {
+			continue
+		}
+		if len(tc.Arguments) > 0 {
+			if data, err := json.Marshal(tc.Arguments); err == nil {
+				arguments = string(data)
+			}
+		}
+
+		wireCall.Function = &openaiFunctionCall{
+			Name:      name,
+			Arguments: arguments,
+		}
+		out = append(out, wireCall)
+	}
+
 	return out
 }
 

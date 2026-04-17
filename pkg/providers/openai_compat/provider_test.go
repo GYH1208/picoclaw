@@ -702,6 +702,49 @@ func TestProviderChat_ExtraBodyOverridesOptions(t *testing.T) {
 	}
 }
 
+func TestProviderChat_ExtraBodyPrefersMaxCompletionTokensOverMaxTokens(t *testing.T) {
+	var requestBody map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{
+					"message":       map[string]any{"content": "ok"},
+					"finish_reason": "stop",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	extraBody := map[string]any{"max_completion_tokens": 2048}
+	p := NewProvider("key", server.URL, "", WithExtraBody(extraBody))
+
+	_, err := p.Chat(
+		t.Context(),
+		[]Message{{Role: "user", Content: "hi"}},
+		nil,
+		"gpt-4o",
+		map[string]any{"max_tokens": 512},
+	)
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+
+	if _, ok := requestBody["max_tokens"]; ok {
+		t.Fatalf("did not expect max_tokens when max_completion_tokens is supplied via extraBody")
+	}
+	if got := requestBody["max_completion_tokens"]; got != float64(2048) {
+		t.Fatalf("max_completion_tokens = %v, want 2048", got)
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {

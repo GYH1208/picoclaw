@@ -660,6 +660,116 @@ func TestCreateProviderFromConfig_QwenUSAlias(t *testing.T) {
 	}
 }
 
+func TestCreateProviderFromConfig_DomesticHTTPProvidersDoNotInjectWebSearchPreview(t *testing.T) {
+	tests := []struct {
+		name                 string
+		model                string
+		expectedReasoningSplit bool
+	}{
+		{name: "zhipu", model: "zhipu/glm-4.7"},
+		{name: "moonshot", model: "moonshot/kimi-k2"},
+		{name: "deepseek", model: "deepseek/deepseek-chat"},
+		{name: "qwen", model: "qwen/qwen-max"},
+		{name: "volcengine", model: "volcengine/doubao-seed-1-6-thinking"},
+		{name: "shengsuanyun", model: "shengsuanyun/deepseek-v3"},
+		{name: "modelscope", model: "modelscope/Qwen/Qwen3-235B-A22B-Instruct-2507"},
+		{name: "mimo", model: "mimo/mimo-v2-pro"},
+		{name: "minimax", model: "minimax/MiniMax-M2.5", expectedReasoningSplit: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requestBody map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}`))
+			}))
+			defer server.Close()
+
+			cfg := &config.ModelConfig{
+				ModelName: tt.name + "-test",
+				Model:     tt.model,
+				APIBase:   server.URL,
+			}
+			cfg.SetAPIKey("test-key")
+
+			provider, modelID, err := CreateProviderFromConfig(cfg)
+			if err != nil {
+				t.Fatalf("CreateProviderFromConfig() error = %v", err)
+			}
+			if _, ok := provider.(*HTTPProvider); !ok {
+				t.Fatalf("expected *HTTPProvider, got %T", provider)
+			}
+
+			ns, ok := provider.(NativeSearchCapable)
+			if !ok {
+				t.Fatalf("provider %T should implement NativeSearchCapable", provider)
+			}
+			if ns.SupportsNativeSearch() {
+				t.Fatal("SupportsNativeSearch() = true, want false for domestic HTTP-compatible provider")
+			}
+
+			tools := []ToolDefinition{
+				{
+					Type: "function",
+					Function: ToolFunctionDefinition{
+						Name:        "read_file",
+						Description: "read a file",
+						Parameters:  map[string]any{"type": "object"},
+					},
+				},
+			}
+
+			_, err = provider.Chat(
+				t.Context(),
+				[]Message{{Role: "user", Content: "hi"}},
+				tools,
+				modelID,
+				map[string]any{"native_search": true},
+			)
+			if err != nil {
+				t.Fatalf("Chat() error = %v", err)
+			}
+
+			toolsAny, ok := requestBody["tools"].([]any)
+			if !ok {
+				t.Fatalf("tools is %T, want []any", requestBody["tools"])
+			}
+			if len(toolsAny) != 1 {
+				t.Fatalf("len(tools) = %d, want 1", len(toolsAny))
+			}
+
+			for _, raw := range toolsAny {
+				toolObj, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				if toolObj["type"] == "web_search_preview" {
+					t.Fatal("tools must not include web_search_preview for domestic HTTP providers")
+				}
+			}
+
+			firstTool, ok := toolsAny[0].(map[string]any)
+			if !ok {
+				t.Fatalf("tools[0] is %T, want map[string]any", toolsAny[0])
+			}
+			if firstTool["type"] != "function" {
+				t.Fatalf("tool type = %v, want function", firstTool["type"])
+			}
+
+			if tt.expectedReasoningSplit {
+				if got, ok := requestBody["reasoning_split"]; !ok || got != true {
+					t.Fatalf("reasoning_split = %v, want true", got)
+				}
+			}
+		})
+	}
+}
+
 func TestCreateProviderFromConfig_CodingPlanAnthropic(t *testing.T) {
 	tests := []struct {
 		name     string
