@@ -69,6 +69,15 @@ func resetGatewayTestState(t *testing.T) {
 	originalRestartForceKillWindow := gatewayRestartForceKillWindow
 	originalRestartPollInterval := gatewayRestartPollInterval
 	t.Setenv("PICOCLAW_HOME", t.TempDir())
+
+	gateway.mu.Lock()
+	gateway.cmd = nil
+	gateway.pidData = nil
+	gateway.bootDefaultModel = ""
+	gateway.bootConfigSignature = ""
+	setGatewayRuntimeStatusLocked("stopped")
+	gateway.mu.Unlock()
+
 	t.Cleanup(func() {
 		gatewayHealthGet = originalHealthGet
 		gatewayRestartGracePeriod = originalRestartGracePeriod
@@ -77,6 +86,7 @@ func resetGatewayTestState(t *testing.T) {
 
 		gateway.mu.Lock()
 		gateway.cmd = nil
+		gateway.pidData = nil
 		gateway.bootDefaultModel = ""
 		gateway.bootConfigSignature = ""
 		setGatewayRuntimeStatusLocked("stopped")

@@ -3,10 +3,13 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/sipeed/picoclaw/pkg/config"
 )
@@ -124,8 +127,15 @@ func TestHandleListTools(t *testing.T) {
 }
 
 func TestHandleUpdateToolState(t *testing.T) {
+	resetGatewayTestState(t)
 	configPath, cleanup := setupOAuthTestEnv(t)
 	defer cleanup()
+
+	prevHealth := gatewayHealthGet
+	gatewayHealthGet = func(string, time.Duration) (*http.Response, error) {
+		return nil, errors.New("test: gateway not running")
+	}
+	t.Cleanup(func() { gatewayHealthGet = prevHealth })
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
@@ -194,5 +204,116 @@ func TestHandleUpdateToolState(t *testing.T) {
 	}
 	if !updated.Tools.Cron.Enabled {
 		t.Fatalf("cron should be enabled: %#v", updated.Tools.Cron)
+	}
+}
+
+func TestHandleUpdateToolState_SkipsRestartWhenGatewayNotRunning(t *testing.T) {
+	resetGatewayTestState(t)
+	configPath, cleanup := setupOAuthTestEnv(t)
+	defer cleanup()
+
+	prevHealth := gatewayHealthGet
+	gatewayHealthGet = func(string, time.Duration) (*http.Response, error) {
+		return nil, errors.New("test: gateway not running")
+	}
+	t.Cleanup(func() { gatewayHealthGet = prevHealth })
+
+	prevRestart := restartGatewayForToolChange
+	calls := 0
+	restartGatewayForToolChange = func(h *Handler) (int, error) {
+		calls++
+		return 0, nil
+	}
+	t.Cleanup(func() { restartGatewayForToolChange = prevRestart })
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/tools/cron/state",
+		bytes.NewBufferString(`{"enabled":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if calls != 0 {
+		t.Fatalf("restartGatewayForToolChange calls = %d, want 0", calls)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if body["restarted"] != false {
+		t.Fatalf("restarted = %#v, want false", body["restarted"])
+	}
+}
+
+func TestHandleUpdateToolState_CallsRestartWhenGatewayRunning(t *testing.T) {
+	resetGatewayTestState(t)
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := config.DefaultConfig()
+	cfg.Agents.Defaults.ModelName = cfg.ModelList[0].ModelName
+	cfg.ModelList[0].SetAPIKey("test-key")
+	cfg.Tools.Exec.Enabled = true
+	if err := config.SaveConfig(configPath, cfg); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	prevRestart := restartGatewayForToolChange
+	calls := 0
+	restartGatewayForToolChange = func(h *Handler) (int, error) {
+		calls++
+		return 424242, nil
+	}
+	t.Cleanup(func() { restartGatewayForToolChange = prevRestart })
+
+	gatewayHealthGet = func(string, time.Duration) (*http.Response, error) {
+		return mockGatewayHealthResponse(http.StatusOK, 1), nil
+	}
+
+	h := NewHandler(configPath)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/tools/exec/state",
+		bytes.NewBufferString(`{"enabled":false}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if calls != 1 {
+		t.Fatalf("restartGatewayForToolChange calls = %d, want 1", calls)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if body["restarted"] != true {
+		t.Fatalf("restarted = %#v, want true", body["restarted"])
+	}
+	pid, ok := body["pid"].(float64)
+	if !ok || pid != 424242 {
+		t.Fatalf("pid = %#v, want 424242", body["pid"])
+	}
+
+	updated, err := config.LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if updated.Tools.Exec.Enabled {
+		t.Fatalf("exec should be disabled after toggle")
 	}
 }

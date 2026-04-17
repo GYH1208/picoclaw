@@ -15,6 +15,8 @@ interface ToolsResponse {
 
 interface ToolActionResponse {
   status: string
+  restarted?: boolean
+  pid?: number
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

@@ -9,6 +9,12 @@ import (
 	"github.com/sipeed/picoclaw/pkg/config"
 )
 
+// restartGatewayForToolChange runs after a tool enable/disable write when the gateway
+// reports status "running". Tests may replace this to avoid spawning a real gateway.
+var restartGatewayForToolChange = func(h *Handler) (int, error) {
+	return h.RestartGateway()
+}
+
 type toolCatalogEntry struct {
 	Name        string
 	Description string
@@ -191,8 +197,25 @@ func (h *Handler) handleUpdateToolState(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	restarted := false
+	restartPID := 0
+	statusData := h.gatewayStatusData()
+	if gatewayStatus, _ := statusData["gateway_status"].(string); gatewayStatus == "running" {
+		var rerr error
+		restartPID, rerr = restartGatewayForToolChange(h)
+		if rerr != nil {
+			http.Error(w, fmt.Sprintf("Failed to restart gateway after tool change: %v", rerr), http.StatusInternalServerError)
+			return
+		}
+		restarted = true
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	json.NewEncoder(w).Encode(map[string]any{
+		"status":    "ok",
+		"restarted": restarted,
+		"pid":       restartPID,
+	})
 }
 
 func buildToolSupport(cfg *config.Config) []toolSupportItem {
