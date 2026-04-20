@@ -77,7 +77,6 @@ export function SkillsPage() {
   const folderImportInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [dropActive, setDropActive] = useState(false)
-  const [autoInstallLowRisk, setAutoInstallLowRisk] = useState(false)
   const [importFeedback, setImportFeedback] = useState<{
     name?: string
     warnings: string[]
@@ -225,7 +224,7 @@ export function SkillsPage() {
     if (!file) return
     const lowerName = file.name.toLowerCase()
     if (lowerName !== "skill.md" && !lowerName.endsWith(".zip")) {
-      toast.error("拖拽上传仅支持 SKILL.md 或 .zip，文件夹请使用“上传文件夹”")
+      toast.error("拖拽仅支持 SKILL.md 或 .zip；文件夹请使用下方「选择文件夹」")
       return
     }
     setImportFeedback(null)
@@ -288,8 +287,10 @@ export function SkillsPage() {
                 <CardContent className="space-y-3 py-5">
                   <div className="text-sm font-medium">文件要求</div>
                   <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                    <li>单文件上传仅支持 `SKILL.md` 或 `.zip`。</li>
-                    <li>文件夹或 `.zip` 必须包含 `SKILL.md`。</li>
+                    <li>
+                      上传支持 `SKILL.md`、`.zip`，或在「上传技能」中使用「选择文件夹」上传本地目录。
+                    </li>
+                    <li>`.zip` 与文件夹根目录均须包含 `SKILL.md`。</li>
                     <li>`SKILL.md` 必须包含 YAML frontmatter，且至少包含 `name` 和 `description`。</li>
                   </ul>
                 </CardContent>
@@ -492,45 +493,33 @@ export function SkillsPage() {
                   <IconUpload className="text-muted-foreground mb-2.5 size-7" />
                 )}
                 <div className="text-foreground text-xl font-medium leading-none">
-                  拖拽文件或点击上传
+                  拖拽或点击上传
                 </div>
-                <div className="text-muted-foreground mt-2 text-sm">
-                  支持 `SKILL.md`、`.zip`，或使用“上传文件夹”
+                <div className="text-muted-foreground mt-2 max-w-md px-3 text-sm leading-relaxed">
+                  支持单文件 `SKILL.md`、`.zip`，或包含 `SKILL.md` 的文件夹。
                 </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
                 <Button
+                  type="button"
                   variant="outline"
-                  onClick={handleImportClick}
+                  size="sm"
+                  className="mt-3"
                   disabled={importMutation.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleFolderImportClick()
+                  }}
                 >
-                  上传文件
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleFolderImportClick}
-                  disabled={importMutation.isPending}
-                >
-                  上传文件夹
+                  选择文件夹
                 </Button>
               </div>
-
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-muted-foreground/40"
-                  checked={autoInstallLowRisk}
-                  onChange={(e) => setAutoInstallLowRisk(e.target.checked)}
-                  disabled={importMutation.isPending}
-                />
-                非高风险自动安装
-              </label>
 
               <div className="space-y-2 rounded-lg border bg-muted/20 px-4 py-3">
                 <div className="text-sm font-semibold">文件要求</div>
                 <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm leading-6">
-                  <li>文件夹或 `.zip` 必须包含 `SKILL.md` 文件</li>
+                  <li>
+                    支持上传 `SKILL.md`、`.zip`，或使用上方「选择文件夹」上传本地目录
+                  </li>
+                  <li>`.zip` 与文件夹根目录均须包含 `SKILL.md`</li>
                   <li>`SKILL.md` 需包含 YAML frontmatter 的 `name` 和 `description`</li>
                 </ul>
               </div>
