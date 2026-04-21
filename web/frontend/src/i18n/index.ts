@@ -30,13 +30,24 @@ i18n
         translation: zh,
       },
     },
+    lng: "zh",
     fallbackLng: "en",
+    supportedLngs: ["en", "zh"],
     debug: false,
+
+    detection: {
+      order: ["localStorage"],
+      caches: ["localStorage"],
+    },
 
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
     },
   })
+
+if (i18n.language?.startsWith("zh")) {
+  dayjs.locale("zh-cn")
+}
 
 i18n.on("languageChanged", (lng) => {
   if (lng.startsWith("zh")) {
