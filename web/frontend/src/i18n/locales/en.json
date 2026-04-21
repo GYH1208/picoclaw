@@ -426,6 +426,13 @@
         "loading_detail": "Loading skill content...",
         "load_detail_error": "Failed to load skill content.",
         "path": "Skill Path",
+        "import_zone_title": "Click to choose how to upload, or drop files/folder here",
+        "import_zone_sub": "Supports `SKILL.md`, `.zip`, or a folder that contains `SKILL.md` (click or drop).",
+        "import_menu_file": "Choose file (SKILL.md or .zip)",
+        "import_menu_folder": "Choose folder…",
+        "import_drop_unrecognized": "Could not import: drop `SKILL.md`, a `.zip`, or a folder containing `SKILL.md`.",
+        "import_missing_skill_md": "The folder must include `SKILL.md`.",
+        "import_bullet_1": "Click the area above and choose File or Folder, or drop `SKILL.md`, a `.zip`, or a folder here.",
         "no_description": "No description provided.",
         "catalog": {
           "agent-browser": {

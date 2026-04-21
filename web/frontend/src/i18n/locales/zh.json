@@ -426,6 +426,13 @@
         "loading_detail": "正在加载技能内容...",
         "load_detail_error": "加载技能内容失败。",
         "path": "技能路径",
+        "import_zone_title": "点击选择上传方式，或将文件/文件夹拖入此区域",
+        "import_zone_sub": "支持 `SKILL.md`、`.zip`，或包含 `SKILL.md` 的文件夹（点击或拖放）。",
+        "import_menu_file": "选择文件（SKILL.md 或 .zip）",
+        "import_menu_folder": "选择文件夹…",
+        "import_drop_unrecognized": "无法导入：请拖入 `SKILL.md`、`.zip` 或包含 `SKILL.md` 的文件夹。",
+        "import_missing_skill_md": "文件夹中必须包含 `SKILL.md`。",
+        "import_bullet_1": "点击上方区域并选择「文件」或「文件夹」，或直接拖放 `SKILL.md`、`.zip` 或整个文件夹。",
         "no_description": "未提供描述。",
         "catalog": {
           "agent-browser": {

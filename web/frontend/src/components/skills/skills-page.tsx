@@ -26,6 +26,7 @@ import {
   getSkills,
   importSkill,
 } from "@/api/skills"
+import { collectFilesFromDataTransfer } from "@/lib/skill-import-files"
 import { PageHeader } from "@/components/page-header"
 import {
   AlertDialog,
@@ -38,6 +39,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Card,
   CardContent,
@@ -184,24 +191,44 @@ export function SkillsPage() {
 
   const handleFolderImportChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
+    event.target.value = ""
     if (files.length === 0) return
+    submitSkillImportFiles(files)
+  }
+
+  const submitSkillImportFiles = (files: File[]) => {
+    if (files.length === 0) return
+
+    if (files.length === 1) {
+      const f = files[0]
+      const ln = f.name.toLowerCase()
+      const nested =
+        Boolean(f.webkitRelativePath?.includes("/")) ||
+        Boolean(f.webkitRelativePath?.includes("\\"))
+      if (!nested) {
+        if (ln === "skill.md" || ln.endsWith(".zip")) {
+          importMutation.mutate({ file: f })
+          return
+        }
+        toast.error(t("pages.agent.skills.import_drop_unrecognized"))
+        return
+      }
+      if (f.name === "SKILL.md") {
+        importMutation.mutate({ files: [f] })
+        return
+      }
+    }
+
     const hasSkillFile = files.some(
       (file) =>
         file.name === "SKILL.md" ||
         file.webkitRelativePath.endsWith("/SKILL.md"),
     )
     if (!hasSkillFile) {
-      toast.error("Folder upload must include SKILL.md")
-      event.target.value = ""
+      toast.error(t("pages.agent.skills.import_missing_skill_md"))
       return
     }
     importMutation.mutate({ files })
-    event.target.value = ""
-  }
-
-  const handleDropZoneClick = () => {
-    if (importMutation.isPending) return
-    handleImportClick()
   }
 
   const handleDropZoneDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -216,19 +243,23 @@ export function SkillsPage() {
     setDropActive(false)
   }
 
-  const handleDropZoneDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleDropZoneDrop = async (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     setDropActive(false)
     if (importMutation.isPending) return
-    const file = event.dataTransfer.files?.[0]
-    if (!file) return
-    const lowerName = file.name.toLowerCase()
-    if (lowerName !== "skill.md" && !lowerName.endsWith(".zip")) {
-      toast.error("拖拽仅支持 SKILL.md 或 .zip；文件夹请使用下方「选择文件夹」")
+    setImportFeedback(null)
+    let files: File[]
+    try {
+      files = await collectFilesFromDataTransfer(event.dataTransfer)
+    } catch {
+      toast.error(t("pages.agent.skills.import_error"))
       return
     }
-    setImportFeedback(null)
-    importMutation.mutate({ file })
+    if (files.length === 0) {
+      toast.error(t("pages.agent.skills.import_drop_unrecognized"))
+      return
+    }
+    submitSkillImportFiles(files)
   }
 
   return (
@@ -287,9 +318,7 @@ export function SkillsPage() {
                 <CardContent className="space-y-3 py-5">
                   <div className="text-sm font-medium">文件要求</div>
                   <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                    <li>
-                      上传支持 `SKILL.md`、`.zip`，或在「上传技能」中使用「选择文件夹」上传本地目录。
-                    </li>
+                    <li>{t("pages.agent.skills.import_bullet_1")}</li>
                     <li>`.zip` 与文件夹根目录均须包含 `SKILL.md`。</li>
                     <li>`SKILL.md` 必须包含 YAML frontmatter，且至少包含 `name` 和 `description`。</li>
                   </ul>
@@ -477,48 +506,68 @@ export function SkillsPage() {
 
             <div className="space-y-4 px-5 py-4">
               <div
-                className={`flex h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed text-center transition-colors ${
-                  dropActive
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-muted-foreground/25 bg-muted/20 hover:bg-muted/30"
-                }`}
-                onClick={handleDropZoneClick}
                 onDragOver={handleDropZoneDragOver}
                 onDragLeave={handleDropZoneDragLeave}
                 onDrop={handleDropZoneDrop}
+                className={`rounded-xl transition-colors ${
+                  dropActive
+                    ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                    : ""
+                }`}
               >
-                {importMutation.isPending ? (
-                  <IconLoader2 className="text-muted-foreground mb-2.5 size-7 animate-spin" />
-                ) : (
-                  <IconUpload className="text-muted-foreground mb-2.5 size-7" />
-                )}
-                <div className="text-foreground text-xl font-medium leading-none">
-                  拖拽或点击上传
-                </div>
-                <div className="text-muted-foreground mt-2 max-w-md px-3 text-sm leading-relaxed">
-                  支持单文件 `SKILL.md`、`.zip`，或包含 `SKILL.md` 的文件夹。
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  disabled={importMutation.isPending}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleFolderImportClick()
-                  }}
-                >
-                  选择文件夹
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={importMutation.isPending}
+                      className={`flex min-h-36 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-3 py-5 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        dropActive
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 bg-muted/20 hover:bg-muted/30"
+                      }`}
+                    >
+                      {importMutation.isPending ? (
+                        <IconLoader2 className="text-muted-foreground mb-2.5 size-7 animate-spin" />
+                      ) : (
+                        <IconUpload className="text-muted-foreground mb-2.5 size-7" />
+                      )}
+                      <div className="text-foreground text-xl font-medium leading-none">
+                        {t("pages.agent.skills.import_zone_title")}
+                      </div>
+                      <div className="text-muted-foreground mt-2 max-w-md text-sm leading-relaxed">
+                        {t("pages.agent.skills.import_zone_sub")}
+                      </div>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="min-w-[14rem]">
+                    <DropdownMenuItem
+                      disabled={importMutation.isPending}
+                      onSelect={() => {
+                        setDocWarningsExpanded(false)
+                        setImportFeedback(null)
+                        handleImportClick()
+                      }}
+                    >
+                      {t("pages.agent.skills.import_menu_file")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={importMutation.isPending}
+                      onSelect={() => {
+                        setDocWarningsExpanded(false)
+                        setImportFeedback(null)
+                        handleFolderImportClick()
+                      }}
+                    >
+                      {t("pages.agent.skills.import_menu_folder")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="space-y-2 rounded-lg border bg-muted/20 px-4 py-3">
                 <div className="text-sm font-semibold">文件要求</div>
                 <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm leading-6">
-                  <li>
-                    支持上传 `SKILL.md`、`.zip`，或使用上方「选择文件夹」上传本地目录
-                  </li>
+                  <li>{t("pages.agent.skills.import_bullet_1")}</li>
                   <li>`.zip` 与文件夹根目录均须包含 `SKILL.md`</li>
                   <li>`SKILL.md` 需包含 YAML frontmatter 的 `name` 和 `description`</li>
                 </ul>
