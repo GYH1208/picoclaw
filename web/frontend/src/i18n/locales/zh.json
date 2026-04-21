@@ -190,7 +190,7 @@
       "virtual": "虚拟"
     },
     "action": {
-      "edit": "编辑 API Key",
+      "edit": "编辑模型",
       "setDefault": "设为默认",
       "delete": "删除模型"
     },
@@ -247,6 +247,7 @@
     },
     "edit": {
       "title": "配置 {{name}}",
+      "virtualIdentityHint": "虚拟模型由多密钥配置展开生成，别名与标识符不可修改。",
       "apiKeyHint": "已设置 API Key，留空表示不修改。",
       "oauthNote": "该服务商使用 OAuth 认证，无需 API Key。",
       "saveError": "保存失败"

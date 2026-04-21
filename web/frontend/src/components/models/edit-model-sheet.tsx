@@ -23,6 +23,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 interface EditForm {
+  modelName: string
+  modelId: string
   apiKey: string
   apiBase: string
   proxy: string
@@ -36,11 +38,28 @@ interface EditForm {
   extraBody: string
 }
 
+const EMPTY_EDIT_FORM: EditForm = {
+  modelName: "",
+  modelId: "",
+  apiKey: "",
+  apiBase: "",
+  proxy: "",
+  authMethod: "",
+  connectMode: "",
+  workspace: "",
+  rpm: "",
+  maxTokensField: "",
+  requestTimeout: "",
+  thinkingLevel: "",
+  extraBody: "",
+}
+
 interface EditModelSheetProps {
   model: ModelInfo | null
   open: boolean
   onClose: () => void
   onSaved: () => void
+  existingModelNames: string[]
 }
 
 export function EditModelSheet({
@@ -48,28 +67,22 @@ export function EditModelSheet({
   open,
   onClose,
   onSaved,
+  existingModelNames,
 }: EditModelSheetProps) {
   const { t } = useTranslation()
-  const [form, setForm] = useState<EditForm>({
-    apiKey: "",
-    apiBase: "",
-    proxy: "",
-    authMethod: "",
-    connectMode: "",
-    workspace: "",
-    rpm: "",
-    maxTokensField: "",
-    requestTimeout: "",
-    thinkingLevel: "",
-    extraBody: "",
-  })
+  const [form, setForm] = useState<EditForm>(EMPTY_EDIT_FORM)
   const [saving, setSaving] = useState(false)
   const [setAsDefault, setSetAsDefault] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<"modelName" | "modelId", string>>
+  >({})
 
   useEffect(() => {
     if (model) {
       setForm({
+        modelName: model.model_name ?? "",
+        modelId: model.model ?? "",
         apiKey: "",
         apiBase: model.api_base ?? "",
         proxy: model.proxy ?? "",
@@ -88,22 +101,59 @@ export function EditModelSheet({
       })
       setSetAsDefault(model.is_default)
       setError("")
+      setFieldErrors({})
     }
   }, [model])
 
   const setField =
     (key: keyof EditForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((f) => ({ ...f, [key]: e.target.value }))
+      if (key === "modelName" && fieldErrors.modelName) {
+        setFieldErrors((prev) => ({ ...prev, modelName: undefined }))
+      }
+      if (key === "modelId" && fieldErrors.modelId) {
+        setFieldErrors((prev) => ({ ...prev, modelId: undefined }))
+      }
+    }
+
+  const validate = (): boolean => {
+    if (!model || model.is_virtual) {
+      return true
+    }
+    const errors: Partial<Record<"modelName" | "modelId", string>> = {}
+    const name = form.modelName.trim()
+    if (!name) {
+      errors.modelName = t("models.add.errorRequired")
+    } else if (
+      existingModelNames.some(
+        (n) => n.trim() === name && n.trim() !== model.model_name.trim(),
+      )
+    ) {
+      errors.modelName = t("models.add.errorDuplicateModelName")
+    }
+    if (!form.modelId.trim()) {
+      errors.modelId = t("models.add.errorRequired")
+    }
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleSave = async () => {
     if (!model) return
+    if (!validate()) return
     setSaving(true)
     setError("")
     try {
+      const nameBefore = model.model_name
+      const newName = model.is_virtual
+        ? model.model_name
+        : form.modelName.trim()
+      const newModelId = model.is_virtual ? model.model : form.modelId.trim()
+
       await updateModel(model.index, {
-        model_name: model.model_name,
-        model: model.model,
+        model_name: newName,
+        model: newModelId,
         api_base: form.apiBase || undefined,
         api_key: form.apiKey || undefined,
         proxy: form.proxy || undefined,
@@ -120,9 +170,13 @@ export function EditModelSheet({
           ? JSON.parse(form.extraBody.trim())
           : {},
       })
+
       if (setAsDefault && !model.is_default) {
-        await setDefaultModel(model.model_name)
+        await setDefaultModel(newName)
+      } else if (model.is_default && nameBefore !== newName) {
+        await setDefaultModel(newName)
       }
+
       onSaved()
       onClose()
     } catch (e) {
@@ -140,6 +194,8 @@ export function EditModelSheet({
       )
     : t("models.field.apiKeyPlaceholder")
 
+  const identityLocked = Boolean(model?.is_virtual)
+
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
@@ -150,13 +206,48 @@ export function EditModelSheet({
           <SheetTitle className="text-base">
             {t("models.edit.title", { name: model?.model_name })}
           </SheetTitle>
-          <SheetDescription className="font-mono text-xs">
-            {model?.model}
-          </SheetDescription>
+          {identityLocked ? (
+            <SheetDescription className="text-xs">
+              {t("models.edit.virtualIdentityHint")}
+            </SheetDescription>
+          ) : null}
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-5 px-6 py-5">
+            <Field
+              label={t("models.add.modelName")}
+              hint={t("models.add.modelNameHint")}
+            >
+              <Input
+                value={form.modelName}
+                onChange={setField("modelName")}
+                placeholder={t("models.add.modelNamePlaceholder")}
+                disabled={identityLocked}
+                aria-invalid={!!fieldErrors.modelName}
+              />
+              {fieldErrors.modelName && (
+                <p className="text-destructive text-xs">{fieldErrors.modelName}</p>
+              )}
+            </Field>
+
+            <Field
+              label={t("models.add.modelId")}
+              hint={t("models.add.modelIdHint")}
+            >
+              <Input
+                value={form.modelId}
+                onChange={setField("modelId")}
+                placeholder={t("models.add.modelIdPlaceholder")}
+                className="font-mono text-sm"
+                disabled={identityLocked}
+                aria-invalid={!!fieldErrors.modelId}
+              />
+              {fieldErrors.modelId && (
+                <p className="text-destructive text-xs">{fieldErrors.modelId}</p>
+              )}
+            </Field>
+
             {!isOAuth && (
               <Field
                 label={t("models.field.apiKey")}
@@ -189,6 +280,7 @@ export function EditModelSheet({
               hint={t("models.defaultOnSave.description")}
               checked={setAsDefault}
               onCheckedChange={setSetAsDefault}
+              disabled={model?.is_virtual}
             />
 
             <AdvancedSection>

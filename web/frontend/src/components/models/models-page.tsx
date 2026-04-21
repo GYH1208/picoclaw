@@ -197,6 +197,7 @@ export function ModelsPage() {
         open={editingModel !== null}
         onClose={() => setEditingModel(null)}
         onSaved={fetchModels}
+        existingModelNames={models.map((m) => m.model_name)}
       />
 
       <AddModelSheet

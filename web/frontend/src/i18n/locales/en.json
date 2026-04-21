@@ -190,7 +190,7 @@
       "virtual": "Virtual"
     },
     "action": {
-      "edit": "Edit API key",
+      "edit": "Edit model",
       "setDefault": "Set as default",
       "delete": "Delete model"
     },
@@ -247,6 +247,7 @@
     },
     "edit": {
       "title": "Configure {{name}}",
+      "virtualIdentityHint": "Virtual models are expanded from multi-key entries; alias and identifier cannot be changed.",
       "apiKeyHint": "A key is already set. Leave blank to keep it unchanged.",
       "oauthNote": "This provider uses OAuth — no API key required.",
       "saveError": "Failed to save"
