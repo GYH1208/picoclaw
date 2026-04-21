@@ -56,6 +56,8 @@
     "renameSessionSaving": "保存中…",
     "renameSessionFailed": "重命名失败，请重试。",
     "messagesCount": "{{count}} 条消息",
+    "copyMessage": "复制消息",
+    "copyFailed": "复制失败，请手动选中内容复制，或使用 https 访问。",
     "noModel": "选择模型",
     "empty": {
       "noConfiguredModel": "尚未配置模型",

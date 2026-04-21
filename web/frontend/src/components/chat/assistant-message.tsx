@@ -1,12 +1,15 @@
 import { IconCheck, IconCopy } from "@tabler/icons-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import ReactMarkdown from "react-markdown"
 import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
 import remarkGfm from "remark-gfm"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { formatMessageTime } from "@/hooks/use-pico-chat"
+import { copyTextToClipboard } from "@/lib/copy-to-clipboard"
 
 interface AssistantMessageProps {
   content: string
@@ -17,15 +20,19 @@ export function AssistantMessage({
   content,
   timestamp = "",
 }: AssistantMessageProps) {
+  const { t } = useTranslation()
   const [isCopied, setIsCopied] = useState(false)
   const formattedTimestamp =
     timestamp !== "" ? formatMessageTime(timestamp) : ""
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content).then(() => {
+  const handleCopy = async () => {
+    const ok = await copyTextToClipboard(content)
+    if (ok) {
       setIsCopied(true)
       setTimeout(() => setIsCopied(false), 2000)
-    })
+    } else {
+      toast.error(t("chat.copyFailed"))
+    }
   }
 
   return (
@@ -52,8 +59,11 @@ export function AssistantMessage({
           </ReactMarkdown>
         </div>
         <Button
+          type="button"
           variant="ghost"
           size="icon"
+          title={t("chat.copyMessage")}
+          aria-label={t("chat.copyMessage")}
           className="bg-background/50 hover:bg-background/80 absolute top-2 right-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={handleCopy}
         >

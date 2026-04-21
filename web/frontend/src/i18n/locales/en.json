@@ -56,6 +56,8 @@
     "renameSessionSaving": "Saving…",
     "renameSessionFailed": "Could not rename this conversation.",
     "messagesCount": "{{count}} messages",
+    "copyMessage": "Copy message",
+    "copyFailed": "Could not copy. Select the text manually, or use HTTPS.",
     "noModel": "Select model",
     "empty": {
       "noConfiguredModel": "No Model Configured",
